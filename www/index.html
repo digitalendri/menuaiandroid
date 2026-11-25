@@ -196,6 +196,47 @@ function renderChips(){
   });
 }
 
+// ---- Tukar sesi antar akun di situs yang sama (mis. Dola 1 dan Dola 2) ----
+// Semua jendela berbagi satu penyimpanan cookie, jadi saat pindah akun: cookie akun lama
+// disimpan, dihapus dari jendela, lalu cookie akun baru dipasang. Hanya cookie yang ditukar.
+var OWN="menuai.owner",SESS="menuai.sess.",swapping=false;
+var CK=null;
+if(NATIVE){try{CK=(C.Plugins&&C.Plugins.CapacitorCookies)||(C.registerPlugin&&C.registerPlugin("CapacitorCookies"))}catch(e){CK=null}}
+function run(fn){try{return Promise.resolve(fn())}catch(e){return Promise.reject(e)}}
+function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
+function getOwner(){try{return JSON.parse(localStorage.getItem(OWN)||"{}")||{}}catch(e){return {}}}
+function setOwner(h,id){var o=getOwner();o[h]=id;try{localStorage.setItem(OWN,JSON.stringify(o))}catch(e){}}
+function sessionSwap(from,to){
+  var info={saved:0,set:0,had:false},fid=views[from.id];
+  return run(function(){return IB.getCookies({url:from.u,includeHttpOnly:true})}).then(function(r){
+    var c=(r&&r.cookies)?r.cookies:r;
+    if(c&&typeof c==="object"){
+      info.saved=Object.keys(c).length;
+      try{localStorage.setItem(SESS+from.id,JSON.stringify(c))}catch(e){}
+    }
+  }).catch(function(){})
+  .then(function(){
+    if(!fid)return;
+    return run(function(){return IB.executeScript({id:fid,code:"try{localStorage.clear();sessionStorage.clear()}catch(e){}"})}).catch(function(){});
+  })
+  .then(function(){
+    return run(function(){return IB.clearCookies({url:from.u,id:fid})})
+      .catch(function(){return run(function(){return IB.clearCookies({url:from.u})})}).catch(function(){});
+  })
+  .then(function(){
+    closeView(from.id);
+    var c=null;try{c=JSON.parse(localStorage.getItem(SESS+to.id)||"null")}catch(e){}
+    if(!c)return;
+    info.had=true;
+    if(!CK)return;
+    var exp=new Date(Date.now()+365*864e5).toUTCString();
+    return Promise.all(Object.keys(c).map(function(k){
+      return run(function(){return CK.setCookie({url:to.u,key:k,value:c[k],expires:exp,path:"/"})}).then(function(){info.set++},function(){});
+    }));
+  })
+  .then(function(){return info});
+}
+
 function hideAll(except){
   if(!IB)return;
   Object.keys(views).forEach(function(id){if(id!==except)safe(IB.hide({id:views[id]}))});
@@ -217,7 +258,22 @@ function select(a){
   $("hint").classList.add("hide");
   hideAll(a.id);
   if(views[a.id]){safe(IB.show({id:views[a.id]}));return}
-  if(opening[a.id])return;
+  if(opening[a.id]||swapping)return;
+  var h=hostOf(a.u),oid=getOwner()[h],other=(oid&&oid!==a.id)?byId(oid):null;
+  if(other&&hostOf(other.u)!==h)other=null;
+  if(other){
+    swapping=true;toast("Menukar sesi ke "+a.n+"…",8000);
+    sessionSwap(other,a).then(function(info){
+      swapping=false;setOwner(h,a.id);
+      var m="Sesi "+other.n+" disimpan ("+info.saved+" cookie). ";
+      m+=!info.had?a.n+" belum punya sesi tersimpan, silakan login."
+        :(CK?a.n+": "+info.set+" cookie dipasang.":"Cookie "+a.n+" tidak bisa dipasang.");
+      toast(m,5000);
+      if(active&&active.id===a.id&&!sheetOpen)select(a);
+    });
+    return;
+  }
+  setOwner(h,a.id);
   opening[a.id]=true;
   var d=rect(),url=a.u;
   lastD=d;
@@ -375,6 +431,7 @@ function cancelEdit(){
 function remove(a){
   if(!confirm("Hapus "+a.n+" dari daftar?"))return;
   list=list.filter(function(x){return x.id!==a.id});save();
+  try{localStorage.removeItem(SESS+a.id)}catch(e){}
   closeView(a.id);
   if(active&&active.id===a.id)active=null;
   if(editId===a.id)cancelEdit();
@@ -425,6 +482,7 @@ $("addbtn").onclick=function(){
 $("reset").onclick=function(){
   if(!confirm("Kembalikan daftar ke bawaan? AI tambahan dan semua perubahan akan hilang."))return;
   Object.keys(views).forEach(closeView);
+  try{list.forEach(function(a){localStorage.removeItem(SESS+a.id)});localStorage.removeItem(OWN)}catch(e){}
   list=DEFAULTS.map(fresh);save();
   active=null;cancelEdit();renderSheet();renderChips();
 };
@@ -438,12 +496,12 @@ try{
 function savePrompts(){try{localStorage.setItem(PKEY,JSON.stringify(plist))}catch(e){}}
 function pById(id){return plist.filter(function(p){return p.id===id})[0]}
 
-function toast(m){
+function toast(m,ms){
   var t=$("toast");
   if(!t){t=document.createElement("div");t.id="toast";t.className="toast";document.body.appendChild(t)}
   t.textContent=m;t.classList.remove("hide");
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){t.classList.add("hide")},2200);
+  toastTimer=setTimeout(function(){t.classList.add("hide")},ms||2200);
 }
 function copyText(s){
   function fallback(){

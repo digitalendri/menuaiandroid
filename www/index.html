@@ -14,9 +14,9 @@ body{background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system
   display:flex;flex-direction:column;overflow:hidden}
 .top{padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px}
 .head{display:flex;align-items:center;gap:8px}
-h1{font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin:0 auto 0 0}
+h1{font-size:26px;white-space:nowrap;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin:0 auto 0 0}
 .tool{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:19px;display:grid;place-items:center;padding:0}
-.atur{height:42px;padding:0 20px;border-radius:21px;border:1px solid var(--line);background:var(--panel);color:var(--acc);font:inherit;font-weight:700}
+.atur{height:42px;padding:0 14px;border-radius:21px;border:1px solid var(--line);background:var(--panel);color:var(--acc);font:inherit;font-weight:700}
 .tool:active,.atur:active{opacity:.7}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
@@ -45,7 +45,12 @@ h1{font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin:0 
 .act:active{opacity:.7}
 .form{display:grid;gap:10px;margin-top:14px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
 .form b{font-size:15px}
-input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}
+input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}
+textarea{min-height:130px;resize:vertical;line-height:1.4}
+.pitem{cursor:pointer}
+.pitem:active{opacity:.7}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:40;max-width:calc(100% - 32px);
+  background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.3);pointer-events:none}
 .crow{display:flex;align-items:center;gap:10px}
 .crow span{font-size:14px;color:var(--mute)}
 input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
@@ -66,6 +71,7 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
   <div class="head">
     <h1>Menu AI</h1>
     <button class="tool" id="reload" aria-label="Muat ulang">&#8635;</button>
+    <button class="atur" id="prm">Prompt</button>
     <button class="atur" id="atur">Atur</button>
   </div>
   <div class="chips" id="chips"></div>
@@ -99,6 +105,23 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
   </div>
   <button class="btn warn" id="reset" style="margin-top:14px">Kembalikan daftar bawaan</button>
   <button class="btn ghost" id="done" style="margin-top:8px">Selesai</button>
+</div>
+
+<div class="sheet hide" id="psheet">
+  <h2>Kumpulan prompt</h2>
+  <p class="note" style="margin-bottom:12px">Ketuk prompt untuk menyalinnya, lalu tempel di kolom chat AI.</p>
+  <div id="plist"></div>
+  <div class="form" id="pform">
+    <b id="pftitle">Tambah prompt</b>
+    <input id="pt" placeholder="Judul, misalnya Ringkas teks" aria-label="Judul prompt">
+    <textarea id="px" placeholder="Isi prompt" aria-label="Isi prompt"></textarea>
+    <p class="msg" id="pmsg"></p>
+    <div class="btns">
+      <button class="btn ghost hide" id="pcancel">Batal</button>
+      <button class="btn" id="psave">Tambah ke daftar</button>
+    </div>
+  </div>
+  <button class="btn ghost" id="pdone" style="margin-top:14px">Selesai</button>
 </div>
 
 <script>
@@ -314,7 +337,12 @@ function openSheet(){
   sheetOpen=true;hideAll();renderSheet();$("sheet").classList.remove("hide");
 }
 function closeSheet(){
-  sheetOpen=false;cancelEdit();$("sheet").classList.add("hide");
+  cancelEdit();$("sheet").classList.add("hide");
+  resume();
+}
+// Kembali ke jendela AI yang aktif setelah lembar Atur/Prompt ditutup.
+function resume(){
+  sheetOpen=false;
   if(active&&!byId(active.id))active=null;
   if(!active){renderChips();showHint();return}
   if(IB&&views[active.id])safe(IB.show({id:views[active.id]}));
@@ -352,6 +380,110 @@ $("reset").onclick=function(){
   list=DEFAULTS.map(fresh);save();
   active=null;cancelEdit();renderSheet();renderChips();
 };
+
+// ---- Prompt ----
+var PKEY="menuai.prompts",plist=[],pEdit=null,toastTimer=null;
+try{
+  var pl=JSON.parse(localStorage.getItem(PKEY)||"[]");
+  if(Array.isArray(pl))plist=pl.filter(function(p){return p&&typeof p.t==="string"&&typeof p.x==="string"}).map(function(p){return {id:p.id||uid(),t:p.t,x:p.x}});
+}catch(e){}
+function savePrompts(){try{localStorage.setItem(PKEY,JSON.stringify(plist))}catch(e){}}
+function pById(id){return plist.filter(function(p){return p.id===id})[0]}
+
+function toast(m){
+  var t=$("toast");
+  if(!t){t=document.createElement("div");t.id="toast";t.className="toast";document.body.appendChild(t)}
+  t.textContent=m;t.classList.remove("hide");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.add("hide")},2200);
+}
+function copyText(s){
+  function fallback(){
+    var ta=document.createElement("textarea"),ok=false;
+    ta.value=s;ta.style.cssText="position:fixed;opacity:0;top:0;left:0";
+    document.body.appendChild(ta);ta.focus();ta.select();
+    try{ok=document.execCommand("copy")}catch(e){}
+    document.body.removeChild(ta);return ok;
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(s).then(function(){return true},function(){return fallback()});
+  }
+  return Promise.resolve(fallback());
+}
+
+function renderPrompts(){
+  var box=$("plist");box.innerHTML="";
+  if(!plist.length){
+    var e=document.createElement("p");e.className="note";e.textContent="Belum ada prompt. Tambah yang pertama di bawah.";
+    box.appendChild(e);
+  }
+  plist.forEach(function(p){
+    var row=document.createElement("div");row.className="srow"+(pEdit===p.id?" editing":"");
+    var it=document.createElement("div");it.className="sitem pitem";
+    it.setAttribute("role","button");
+    var t=document.createElement("div");t.style.minWidth="0";
+    var nm=document.createElement("div");nm.className="sname";nm.textContent=p.t;
+    var pv=document.createElement("div");pv.className="surl";pv.textContent=p.x.replace(/\s+/g," ");
+    t.appendChild(nm);t.appendChild(pv);it.appendChild(t);
+    it.onclick=function(){
+      copyText(p.x).then(function(ok){
+        closePrompts();
+        toast(ok?"Prompt tersalin. Tempel di kolom chat.":"Gagal menyalin prompt.");
+      });
+    };
+    row.appendChild(it);
+    var ed=document.createElement("button");ed.className="act edit";ed.textContent="Ubah";
+    ed.onclick=function(){pStartEdit(p)};
+    var x=document.createElement("button");x.className="act del";x.textContent="Hapus";
+    x.onclick=function(){pRemove(p)};
+    row.appendChild(ed);row.appendChild(x);
+    box.appendChild(row);
+  });
+}
+function pStartEdit(p){
+  pEdit=p.id;
+  $("pt").value=p.t;$("px").value=p.x;$("pmsg").textContent="";
+  $("pftitle").textContent="Ubah prompt";
+  $("psave").textContent="Simpan perubahan";
+  $("pcancel").classList.remove("hide");
+  renderPrompts();
+  try{$("pform").scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+}
+function pCancel(){
+  pEdit=null;
+  $("pt").value="";$("px").value="";$("pmsg").textContent="";
+  $("pftitle").textContent="Tambah prompt";
+  $("psave").textContent="Tambah ke daftar";
+  $("pcancel").classList.add("hide");
+}
+function pRemove(p){
+  if(!confirm("Hapus prompt \""+p.t+"\"?"))return;
+  plist=plist.filter(function(x){return x.id!==p.id});savePrompts();
+  if(pEdit===p.id)pCancel();
+  renderPrompts();
+}
+function openPrompts(){
+  sheetOpen=true;hideAll();renderPrompts();$("psheet").classList.remove("hide");
+}
+function closePrompts(){
+  pCancel();$("psheet").classList.add("hide");resume();
+}
+$("prm").onclick=openPrompts;
+$("pdone").onclick=closePrompts;
+$("pcancel").onclick=function(){pCancel();renderPrompts()};
+$("psave").onclick=function(){
+  var t=$("pt").value.trim(),x=$("px").value.trim(),m=$("pmsg");
+  if(!x){m.textContent="Isi prompt-nya dulu.";return}
+  if(!t)t=x.replace(/\s+/g," ").slice(0,28);
+  if(pEdit){
+    var p=pById(pEdit);
+    if(p){p.t=t;p.x=x}
+  }else{
+    plist.push({id:uid(),t:t,x:x});
+  }
+  savePrompts();pCancel();renderPrompts();
+};
+["pt","px"].forEach(function(id){$(id).oninput=function(){$("pmsg").textContent=""}});
 
 // ---- Tema menu aplikasi ----
 var THEME_KEY="menuai.theme";

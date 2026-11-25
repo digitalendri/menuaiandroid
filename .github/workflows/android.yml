@@ -25,6 +25,41 @@ jobs:
       - name: Pasang dependensi
         run: npm install
 
+      - name: Pasang patch profil WebView (login terpisah per akun)
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          p = "node_modules/@capgo/inappbrowser/android/src/main/java/ee/forgr/capacitor_inappbrowser/WebViewDialog.java"
+          s = open(p, encoding="utf-8").read()
+          if "MENUAI_PROFILE_PATCH" in s:
+              print("Patch profil sudah terpasang, dilewati.")
+              sys.exit(0)
+          pat = re.compile(r"^([ \t]*)this\._webView = findViewById\(R\.id\.browser_view\);[ \t]*\r?\n", re.M)
+          found = pat.findall(s)
+          if len(found) != 1:
+              print("::error::Baris pembuatan WebView tidak ditemukan tepat satu kali (ditemukan %d). Versi plugin mungkin berubah." % len(found))
+              sys.exit(1)
+          snippet = r'''// MENUAI_PROFILE_PATCH: item dengan judul "menuai-profile:<id>" memakai profil WebView sendiri (cookie dan login terpisah).
+          try {
+              String menuaiTitle = this._options != null ? this._options.getTitle() : null;
+              String menuaiPrefix = "menuai-profile:";
+              if (menuaiTitle != null && menuaiTitle.startsWith(menuaiPrefix) && WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+                  String menuaiName = "menuai_" + menuaiTitle.substring(menuaiPrefix.length()).replaceAll("[^A-Za-z0-9_]", "_");
+                  WebViewCompat.setProfile(this._webView, menuaiName);
+                  Log.i("InAppBrowser", "Profil WebView: " + menuaiName);
+              }
+          } catch (Throwable menuaiError) {
+              Log.w("InAppBrowser", "Gagal memasang profil WebView", menuaiError);
+          }
+          '''
+          def add(m):
+              ind = m.group(1)
+              return m.group(0) + "".join(ind + l + "\n" for l in snippet.splitlines())
+          s = pat.sub(add, s, count=1)
+          open(p, "w", encoding="utf-8").write(s)
+          print("Patch profil WebView terpasang.")
+          PY
+
       - name: Buat proyek Android
         run: |
           npx cap add android

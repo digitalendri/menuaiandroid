@@ -21,10 +21,10 @@ jobs:
       - name: Pasang dependensi
         run: npm install
 
-            - name: Buat proyek Android
+      - name: Buat proyek Android
         run: |
           npx cap add android
-          npx capacitor-assets generate --android
+          npx capacitor-assets generate --android || echo "Lewati ikon: assets tidak lengkap"
           npx cap sync android
 
       - name: Pakai debug keystore tetap (opsional)

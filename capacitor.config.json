@@ -1,5 +1,13 @@
 {
   "appId": "com.menuai.app",
   "appName": "Menu AI",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 800,
+      "backgroundColor": "#0e7c66",
+      "showSpinner": false
+    }
+  }
 }

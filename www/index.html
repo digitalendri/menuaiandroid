@@ -30,17 +30,27 @@ h1{font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin:0 
 .sheet{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;
   padding:calc(env(safe-area-inset-top,0px) + 14px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);overflow-y:auto}
 .sheet h2{margin:0 0 12px;font-size:22px}
-.srow{display:flex;gap:8px;margin-bottom:8px}
+.srow{display:flex;gap:6px;margin-bottom:8px}
 .sitem{flex:1;display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);min-width:0}
+.srow.editing .sitem{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 .sdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0}
 .sname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .surl{font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.del{border:1px solid var(--line);background:var(--panel);color:var(--danger);border-radius:14px;padding:0 14px;font:inherit;font-size:14px}
+.act{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:0 12px;font:inherit;font-size:14px;font-weight:600}
+.act.edit{color:var(--acc)}
+.act.del{color:var(--danger)}
+.act:active{opacity:.7}
 .form{display:grid;gap:10px;margin-top:14px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
 .form b{font-size:15px}
 input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}
+.crow{display:flex;align-items:center;gap:10px}
+.crow span{font-size:14px;color:var(--mute)}
+input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
+.btns{display:flex;gap:8px}
+.btns .btn{flex:1}
 .btn{font:inherit;font-weight:700;border:0;border-radius:12px;background:var(--acc);color:var(--bg);padding:12px 16px;min-height:48px}
 .btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.btn.warn{background:var(--panel);color:var(--danger);border:1px solid var(--line)}
 .msg{margin:0;font-size:13px;color:var(--danger);min-height:18px}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-weight:600}
@@ -63,6 +73,17 @@ input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--
 <div class="sheet hide" id="sheet">
   <h2>Atur daftar AI</h2>
   <div id="slist"></div>
+  <div class="form" id="form">
+    <b id="ftitle">Tambah AI</b>
+    <input id="n" placeholder="Nama, misalnya Mistral" aria-label="Nama AI">
+    <input id="u" placeholder="chat.mistral.ai" aria-label="Alamat situs" inputmode="url" autocapitalize="none">
+    <div class="crow"><input type="color" id="c" value="#6b7a76" aria-label="Warna"><span>Warna tombol</span></div>
+    <p class="msg" id="msg"></p>
+    <div class="btns">
+      <button class="btn ghost hide" id="cancel">Batal</button>
+      <button class="btn" id="addbtn">Tambah ke daftar</button>
+    </div>
+  </div>
   <div class="form">
     <b>Tema menu aplikasi</b>
     <div class="seg" id="seg">
@@ -72,14 +93,8 @@ input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--
     </div>
     <p class="note">Mengatur tampilan menu di atas. Tema tiap situs AI diatur di pengaturan situsnya sendiri.</p>
   </div>
-  <div class="form">
-    <b>Tambah AI</b>
-    <input id="n" placeholder="Nama, misalnya Mistral" aria-label="Nama AI">
-    <input id="u" placeholder="chat.mistral.ai" aria-label="Alamat situs" inputmode="url" autocapitalize="none">
-    <p class="msg" id="msg"></p>
-    <button class="btn" id="addbtn">Tambah ke daftar</button>
-  </div>
-  <button class="btn ghost" id="done" style="margin-top:14px">Selesai</button>
+  <button class="btn warn" id="reset" style="margin-top:14px">Kembalikan daftar bawaan</button>
+  <button class="btn ghost" id="done" style="margin-top:8px">Selesai</button>
 </div>
 
 <script>
@@ -95,12 +110,29 @@ var DEFAULTS=[
 {n:"Perplexity",u:"https://www.perplexity.ai",c:"#1f8a9e"},
 {n:"DeepSeek",u:"https://chat.deepseek.com",c:"#4d6bfe"}
 ];
-var KEY="menuai.custom",LAST="menuai.last",custom=[],active=null,views={},sheetOpen=false;
-try{custom=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){custom=[]}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(custom))}catch(e){}}
+var LIST="menuai.list",OLD="menuai.custom",LAST="menuai.last";
+var active=null,views={},opening={},sheetOpen=false,editId=null;
+
 function $(id){return document.getElementById(id)}
-function all(){return DEFAULTS.concat(custom.map(function(x){x.custom=true;x.c=x.c||"#6b7a76";return x}))}
-function find(n){return all().filter(function(a){return a.n===n})[0]}
+function uid(){return "a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function valid(x){return x&&typeof x.n==="string"&&typeof x.u==="string"}
+function fresh(x){return {id:x.id||uid(),n:x.n,u:x.u,c:x.c||"#6b7a76"}}
+
+// Seluruh daftar (bawaan + tambahan) disimpan sebagai satu daftar supaya semuanya bisa diubah/dihapus.
+// Daftar tambahan dari versi lama (menuai.custom) otomatis ikut dipindahkan.
+function load(){
+  var l=null;
+  try{l=JSON.parse(localStorage.getItem(LIST)||"null")}catch(e){}
+  if(Array.isArray(l))return l.filter(valid).map(fresh);
+  var old=[];
+  try{old=JSON.parse(localStorage.getItem(OLD)||"[]")}catch(e){}
+  if(!Array.isArray(old))old=[];
+  return DEFAULTS.map(fresh).concat(old.filter(valid).map(fresh));
+}
+var list=load();
+function save(){try{localStorage.setItem(LIST,JSON.stringify(list))}catch(e){}}
+save();
+function byId(id){return list.filter(function(a){return a.id===id})[0]}
 
 var C=window.Capacitor;
 var IB=null,NATIVE=!!(C&&C.isNativePlatform&&C.isNativePlatform());
@@ -115,101 +147,164 @@ function rect(){
 }
 function safe(p){try{var r=p;if(r&&r.catch)r.catch(function(){})}catch(e){}}
 
+function showHint(t){
+  var h=$("hint");
+  h.textContent=t||(list.length?"Pilih AI di atas, jendelanya muncul di sini.":"Daftar kosong. Tambah AI lewat tombol Atur.");
+  h.classList.remove("hide");
+}
+
 function renderChips(){
   var box=$("chips");box.innerHTML="";
-  all().forEach(function(a){
+  list.forEach(function(a){
+    var on=active&&active.id===a.id;
     var b=document.createElement("button");
-    b.className="chip"+(active&&active.n===a.n?" on":"");
+    b.className="chip"+(on?" on":"");
     b.textContent=a.n;
-    if(active&&active.n===a.n)b.style.backgroundColor=a.c;
+    if(on)b.style.backgroundColor=a.c;
     b.onclick=function(){select(a)};
     box.appendChild(b);
-    if(active&&active.n===a.n){setTimeout(function(){try{b.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}},0)}
+    if(on){setTimeout(function(){try{b.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}},0)}
   });
 }
 
 function hideAll(except){
   if(!IB)return;
-  Object.keys(views).forEach(function(n){if(n!==except)safe(IB.hide({id:views[n]}))});
+  Object.keys(views).forEach(function(id){if(id!==except)safe(IB.hide({id:views[id]}))});
+}
+function closeView(id){
+  if(IB&&views[id])safe(IB.close({id:views[id]}));
+  delete views[id];
 }
 
 function select(a){
   active=a;
-  try{localStorage.setItem(LAST,a.n)}catch(e){}
+  try{localStorage.setItem(LAST,a.id)}catch(e){}
   renderChips();
   if(!IB){
-    $("hint").classList.remove("hide");
-    $("hint").textContent="Jendela tertanam hanya jalan di aplikasi Android. Membuka "+a.n+" di tab baru.";
+    showHint("Jendela tertanam hanya jalan di aplikasi Android. Membuka "+a.n+" di tab baru.");
     window.open(a.u,"_blank");
     return;
   }
   $("hint").classList.add("hide");
-  hideAll(a.n);
-  if(views[a.n]){safe(IB.show({id:views[a.n]}));return}
-  var d=rect();
+  hideAll(a.id);
+  if(views[a.id]){safe(IB.show({id:views[a.id]}));return}
+  if(opening[a.id])return;
+  opening[a.id]=true;
+  var d=rect(),url=a.u;
   lastD=d;
   IB.openWebView({
-    url:a.u,x:d.x,y:d.y,width:d.width,height:d.height,
+    url:url,x:d.x,y:d.y,width:d.width,height:d.height,
     toolbarType:"blank",enabledSafeTopMargin:false,enabledSafeBottomMargin:false,title:a.n
   }).then(function(r){
-    views[a.n]=r.id;
-    if(!active||active.n!==a.n||sheetOpen)safe(IB.hide({id:r.id}));
+    delete opening[a.id];
+    var cur=byId(a.id);
+    // Item dihapus atau alamatnya diubah selama jendela sedang dibuka: buang jendela ini.
+    if(!cur||cur.u!==url){safe(IB.close({id:r.id}));return}
+    views[a.id]=r.id;
+    if(!active||active.id!==a.id||sheetOpen)safe(IB.hide({id:r.id}));
   }).catch(function(e){
-    $("hint").classList.remove("hide");
-    $("hint").textContent="Gagal membuka "+a.n+": "+(e&&e.message?e.message:e);
+    delete opening[a.id];
+    showHint("Gagal membuka "+a.n+": "+(e&&e.message?e.message:e));
   });
 }
 
 $("reload").onclick=function(){
-  if(IB&&active&&views[active.n])safe(IB.reload({id:views[active.n]}));
+  if(IB&&active&&views[active.id])safe(IB.reload({id:views[active.id]}));
 };
 
 // ---- Atur ----
 function renderSheet(){
   var box=$("slist");box.innerHTML="";
-  all().forEach(function(a){
-    var row=document.createElement("div");row.className="srow";
+  if(!list.length){
+    var p=document.createElement("p");p.className="note";p.textContent="Daftar kosong. Tambah AI di bawah atau kembalikan daftar bawaan.";
+    box.appendChild(p);
+  }
+  list.forEach(function(a){
+    var row=document.createElement("div");row.className="srow"+(editId===a.id?" editing":"");
     var it=document.createElement("div");it.className="sitem";
     var d=document.createElement("span");d.className="sdot";d.style.background=a.c;d.textContent=a.n.charAt(0).toUpperCase();
     var t=document.createElement("div");t.style.minWidth="0";
     var nm=document.createElement("div");nm.className="sname";nm.textContent=a.n;
     var ur=document.createElement("div");ur.className="surl";ur.textContent=a.u.replace(/^https?:\/\//,"");
     t.appendChild(nm);t.appendChild(ur);it.appendChild(d);it.appendChild(t);row.appendChild(it);
-    if(a.custom){
-      var x=document.createElement("button");x.className="del";x.textContent="Hapus";
-      x.onclick=function(){
-        custom=custom.filter(function(c){return c.n!==a.n});save();
-        if(IB&&views[a.n]){safe(IB.close({id:views[a.n]}));delete views[a.n]}
-        if(active&&active.n===a.n)active=null;
-        renderSheet();renderChips();
-      };
-      row.appendChild(x);
-    }
+
+    var ed=document.createElement("button");ed.className="act edit";ed.textContent="Ubah";
+    ed.onclick=function(){startEdit(a)};
+    var x=document.createElement("button");x.className="act del";x.textContent="Hapus";
+    x.onclick=function(){remove(a)};
+    row.appendChild(ed);row.appendChild(x);
     box.appendChild(row);
   });
 }
+
+function startEdit(a){
+  editId=a.id;
+  $("n").value=a.n;$("u").value=a.u;$("c").value=a.c;$("msg").textContent="";
+  $("ftitle").textContent="Ubah "+a.n;
+  $("addbtn").textContent="Simpan perubahan";
+  $("cancel").classList.remove("hide");
+  renderSheet();
+  try{$("form").scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+}
+function cancelEdit(){
+  editId=null;
+  $("n").value="";$("u").value="";$("c").value="#6b7a76";$("msg").textContent="";
+  $("ftitle").textContent="Tambah AI";
+  $("addbtn").textContent="Tambah ke daftar";
+  $("cancel").classList.add("hide");
+}
+
+function remove(a){
+  if(!confirm("Hapus "+a.n+" dari daftar?"))return;
+  list=list.filter(function(x){return x.id!==a.id});save();
+  closeView(a.id);
+  if(active&&active.id===a.id)active=null;
+  if(editId===a.id)cancelEdit();
+  renderSheet();renderChips();
+}
+
 function openSheet(){
   sheetOpen=true;hideAll();renderSheet();$("sheet").classList.remove("hide");
 }
 function closeSheet(){
-  sheetOpen=false;$("sheet").classList.add("hide");
-  if(IB&&active&&views[active.n])safe(IB.show({id:views[active.n]}));
-  else if(!active)$("hint").classList.remove("hide");
+  sheetOpen=false;cancelEdit();$("sheet").classList.add("hide");
+  if(active&&!byId(active.id))active=null;
+  if(!active){renderChips();showHint();return}
+  if(IB&&views[active.id])safe(IB.show({id:views[active.id]}));
+  else select(active); // misalnya alamatnya baru diubah
 }
 $("atur").onclick=openSheet;
 $("done").onclick=closeSheet;
+$("cancel").onclick=function(){cancelEdit();renderSheet()};
 
 $("addbtn").onclick=function(){
-  var n=$("n").value.trim(),u=$("u").value.trim(),m=$("msg");
+  var n=$("n").value.trim(),u=$("u").value.trim(),c=$("c").value||"#6b7a76",m=$("msg");
   if(!n){m.textContent="Isi nama AI dulu.";return}
   if(!u){m.textContent="Isi alamat situsnya.";return}
-  if(find(n)){m.textContent="Nama itu sudah ada.";return}
+  var dup=list.some(function(x){return x.id!==editId&&x.n.toLowerCase()===n.toLowerCase()});
+  if(dup){m.textContent="Nama itu sudah ada.";return}
   if(!/^https?:\/\//i.test(u))u="https://"+u;
   try{new URL(u)}catch(e){m.textContent="Alamat situs tidak valid.";return}
-  custom.push({n:n,u:u});save();renderSheet();renderChips();
-  $("n").value="";$("u").value="";m.textContent="";
+
+  if(editId){
+    var a=byId(editId);
+    if(a){
+      if(a.u!==u)closeView(a.id); // jendela lama dibuang, dibuka ulang dengan alamat baru
+      a.n=n;a.u=u;a.c=c;
+    }
+  }else{
+    list.push({id:uid(),n:n,u:u,c:c});
+  }
+  save();cancelEdit();renderSheet();renderChips();
 };
 ["n","u"].forEach(function(id){$(id).oninput=function(){$("msg").textContent=""}});
+
+$("reset").onclick=function(){
+  if(!confirm("Kembalikan daftar ke bawaan? AI tambahan dan semua perubahan akan hilang."))return;
+  Object.keys(views).forEach(closeView);
+  list=DEFAULTS.map(fresh);save();
+  active=null;cancelEdit();renderSheet();renderChips();
+};
 
 // ---- Tema menu aplikasi ----
 var THEME_KEY="menuai.theme";
@@ -237,8 +332,8 @@ function relayout(){
     var d=rect();
     if(lastD&&Math.abs(d.width-lastD.width)<=2&&Math.abs(d.x-lastD.x)<=2&&Math.abs(d.y-lastD.y)<=2&&d.height<=lastD.height+2)return;
     lastD=d;
-    Object.keys(views).forEach(function(n){
-      safe(IB.updateDimensions({id:views[n],x:d.x,y:d.y,width:d.width,height:d.height}));
+    Object.keys(views).forEach(function(id){
+      safe(IB.updateDimensions({id:views[id],x:d.x,y:d.y,width:d.width,height:d.height}));
     });
   },250);
 }
@@ -246,7 +341,13 @@ if(window.ResizeObserver){new ResizeObserver(relayout).observe($("stage"))}
 window.addEventListener("resize",relayout);
 
 renderChips();
-try{var last=localStorage.getItem(LAST);var f=last&&find(last);if(f)setTimeout(function(){select(f)},300)}catch(e){}
+if(!list.length)showHint();
+try{
+  var last=localStorage.getItem(LAST);
+  // Versi lama menyimpan nama, versi baru menyimpan id.
+  var f=last&&(byId(last)||list.filter(function(a){return a.n===last})[0]);
+  if(f)setTimeout(function(){select(f)},300);
+}catch(e){}
 </script>
 </body>
 </html>

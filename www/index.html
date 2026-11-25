@@ -235,8 +235,18 @@ function select(a){
   });
 }
 
+// Muat ulang: utamakan menjalankan location.reload() di jendela yang aktif,
+// kalau gagal baru pakai IB.reload(). Hasilnya diberi tahu lewat toast.
 $("reload").onclick=function(){
-  if(IB&&active&&views[active.id])safe(IB.reload({id:views[active.id]}));
+  if(!IB){toast("Muat ulang hanya jalan di aplikasi Android.");return}
+  if(!active||!views[active.id]){toast("Belum ada jendela AI yang terbuka.");return}
+  var id=views[active.id];
+  function run(fn){try{return Promise.resolve(fn())}catch(e){return Promise.reject(e)}}
+  run(function(){return IB.executeScript({id:id,code:"window.location.reload()"})})
+    .then(function(){toast("Memuat ulang…")},function(){
+      run(function(){return IB.reload({id:id})})
+        .then(function(){toast("Memuat ulang…")},function(){toast("Gagal memuat ulang.")});
+    });
 };
 
 // ---- Atur ----

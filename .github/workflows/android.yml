@@ -39,21 +39,44 @@ jobs:
           done
           grep -n "uses-permission" "$F"
 
-      - name: Pakai debug keystore tetap (opsional)
+      - name: Pasang tanda tangan tetap dari secret
         env:
           KS: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          KS_ALIAS: ${{ secrets.DEBUG_KEYSTORE_ALIAS }}
+          KS_PASS: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KS" ]; then
-            mkdir -p ~/.android
-            echo "$KS" | base64 -d > ~/.android/debug.keystore
-            echo "Memakai keystore dari secret."
-          else
-            echo "Tidak ada secret keystore, memakai keystore otomatis."
+          if [ -z "$KS" ]; then
+            echo "::error::Secret DEBUG_KEYSTORE_BASE64 kosong. APK akan memakai kunci acak dan tidak bisa di-upgrade."
+            exit 1
           fi
+          ALIAS="${KS_ALIAS:-androiddebugkey}"
+          PASS="${KS_PASS:-android}"
+          echo "$KS" | base64 -d > android/app/menuai.keystore
+          echo "Memeriksa keystore (alias: $ALIAS)..."
+          keytool -list -keystore android/app/menuai.keystore -storepass "$PASS" -alias "$ALIAS"
+          cat >> android/app/build.gradle <<EOF
+
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file("menuai.keystore")
+                      storePassword "$PASS"
+                      keyAlias "$ALIAS"
+                      keyPassword "$PASS"
+                  }
+              }
+          }
+          EOF
+          echo "Tanda tangan debug diarahkan ke menuai.keystore."
 
       - name: Build APK
         working-directory: android
         run: ./gradlew assembleDebug
+
+      - name: Tampilkan sidik jari tanda tangan APK
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -E "certificate (DN|SHA-256)" || true
 
       - name: Simpan APK
         uses: actions/upload-artifact@v4

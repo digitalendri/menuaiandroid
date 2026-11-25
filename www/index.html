@@ -19,7 +19,6 @@ h1{font-size:24px;margin:0}
 .link[aria-pressed=true]{background:var(--accbg)}
 .sub{margin:0 0 18px;color:var(--mute);font-size:14px}
 .row{margin-bottom:10px}
-.row.hidden-item{opacity:.55}
 .main{display:flex;align-items:stretch}
 .item{flex:1;display:flex;align-items:center;gap:14px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);font:inherit;font-size:17px;text-align:left;min-height:60px;width:100%}
 .item:active{background:var(--accbg)}
@@ -68,7 +67,7 @@ input[type=text],input:not([type]){font:inherit;color:var(--ink);background:var(
       <button class="btn alt" id="cancelbtn" style="display:none">Batal</button>
     </div>
   </details>
-  <button class="btn alt reset" id="resetbtn" style="display:none">Reset urutan dan tampilan</button>
+  <button class="btn alt reset" id="resetbtn" style="display:none">Pulihkan AI bawaan yang terhapus</button>
   <p class="note" id="note"></p>
 </div>
 
@@ -84,7 +83,7 @@ var DEFAULTS=[
 ];
 var COLORS=["#0e7c66","#4a6cf7","#c0603a","#b5338a","#d4891c","#333b4a"];
 var KEY="menuai.state",OLDKEY="menuai.custom";
-var state={custom:[],hidden:[],order:[]},editing=false,editId=null,color=COLORS[0];
+var state={items:seed()},editing=false,editId=null,color=COLORS[0];
 
 function $(id){return document.getElementById(id)}
 function note(t){$("note").textContent=t||""}
@@ -92,6 +91,8 @@ var CAP=window.Capacitor;
 var NATIVE=!!(CAP&&CAP.isNativePlatform&&CAP.isNativePlatform());
 function plug(name){return NATIVE&&CAP.Plugins&&CAP.Plugins[name]||null}
 function safe(p){if(p&&p.catch)p.catch(function(){})}
+function clone(a){return{id:a.id,n:a.n,u:a.u,c:a.c}}
+function seed(){return DEFAULTS.map(clone)}
 
 /* ---------- penyimpanan: Preferences di app, localStorage di browser ---------- */
 function load(){
@@ -99,44 +100,40 @@ function load(){
   var getRaw=P?P.get({key:KEY}).then(function(r){return r&&r.value}).catch(function(){return null})
               :Promise.resolve(localStorage.getItem(KEY));
   return getRaw.then(function(raw){
-    if(raw){try{return normalize(JSON.parse(raw))}catch(e){}}
-    return migrate();
-  }).catch(function(){return migrate()});
+    if(raw){try{return fromSaved(JSON.parse(raw))}catch(e){}}
+    return migrateOld();
+  }).catch(function(){return migrateOld()});
 }
-function migrate(){
-  var s={custom:[],hidden:[],order:[]};
+function validItems(arr){
+  return(Array.isArray(arr)?arr:[]).filter(function(x){return x&&x.id&&x.n&&x.u})
+    .map(function(x){return{id:String(x.id),n:String(x.n),u:String(x.u),c:x.c||COLORS[0]}});
+}
+/* v2 punya "items"; v1 punya custom/hidden/order (AI bawaan terpisah) */
+function fromSaved(s){
+  if(s&&Array.isArray(s.items))return{items:validItems(s.items)};
+  var map={},items=[],seen={};
+  var all=DEFAULTS.map(clone).concat(validItems(s&&s.custom));
+  all.forEach(function(a){map[a.id]=a});
+  (Array.isArray(s&&s.order)?s.order:[]).forEach(function(id){if(map[id]&&!seen[id]){items.push(map[id]);seen[id]=1}});
+  all.forEach(function(a){if(!seen[a.id]){items.push(a);seen[a.id]=1}});
+  var hidden=Array.isArray(s&&s.hidden)?s.hidden:[];
+  return{items:items.filter(function(a){return hidden.indexOf(a.id)<0})};
+}
+function migrateOld(){
+  var items=seed();
   try{
     var old=JSON.parse(localStorage.getItem(OLDKEY)||"[]");
-    old.forEach(function(x,i){if(x&&x.n&&x.u)s.custom.push({id:"c:m"+i,n:String(x.n),u:String(x.u),c:x.c||COLORS[0]})});
+    old.forEach(function(x,i){if(x&&x.n&&x.u)items.push({id:"c:m"+i,n:String(x.n),u:String(x.u),c:x.c||COLORS[0]})});
   }catch(e){}
-  return s;
-}
-function normalize(s){
-  s=s||{};
-  return{
-    custom:(Array.isArray(s.custom)?s.custom:[]).filter(function(x){return x&&x.id&&x.n&&x.u}).map(function(x){return{id:String(x.id),n:String(x.n),u:String(x.u),c:x.c||COLORS[0]}}),
-    hidden:Array.isArray(s.hidden)?s.hidden:[],
-    order:Array.isArray(s.order)?s.order:[]
-  };
+  return{items:items};
 }
 function save(){
-  var raw=JSON.stringify(state),P=plug("Preferences");
+  var raw=JSON.stringify({v:2,items:state.items}),P=plug("Preferences");
   if(P){safe(P.set({key:KEY,value:raw}));return}
   try{localStorage.setItem(KEY,raw)}catch(e){}
 }
 
 /* ---------- daftar ---------- */
-function everything(){return DEFAULTS.concat(state.custom)}
-function ordered(){
-  var map={},out=[],seen={};
-  everything().forEach(function(a){map[a.id]=a});
-  state.order.forEach(function(id){if(map[id]&&!seen[id]){out.push(map[id]);seen[id]=1}});
-  everything().forEach(function(a){if(!seen[a.id]){out.push(a);seen[a.id]=1}});
-  return out;
-}
-function isCustom(a){return a.id.charAt(0)==="c"}
-function isHidden(a){return state.hidden.indexOf(a.id)>-1}
-
 function openAI(a){
   note("");
   var B=plug("Browser");
@@ -152,21 +149,16 @@ function openAI(a){
 }
 
 function move(id,dir){
-  var ids=ordered().map(function(a){return a.id}),i=ids.indexOf(id),j=i+dir;
-  if(i<0||j<0||j>=ids.length)return;
-  var t=ids[i];ids[i]=ids[j];ids[j]=t;
-  state.order=ids;save();render();
-}
-function toggleHidden(a){
-  var i=state.hidden.indexOf(a.id);
-  if(i>-1)state.hidden.splice(i,1);else state.hidden.push(a.id);
+  var list=state.items,i=-1;
+  list.forEach(function(a,k){if(a.id===id)i=k});
+  var j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  var t=list[i];list[i]=list[j];list[j]=t;
   save();render();
 }
 function remove(a){
   if(!confirm("Hapus "+a.n+" dari daftar?"))return;
-  state.custom=state.custom.filter(function(c){return c.id!==a.id});
-  state.order=state.order.filter(function(x){return x!==a.id});
-  state.hidden=state.hidden.filter(function(x){return x!==a.id});
+  state.items=state.items.filter(function(c){return c.id!==a.id});
   if(editId===a.id)resetForm();
   save();render();
 }
@@ -176,18 +168,19 @@ function host(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){re
 
 function render(){
   var box=$("list");box.innerHTML="";
-  var items=ordered();
-  var shown=editing?items:items.filter(function(a){return !isHidden(a)});
+  var shown=state.items;
   $("sub").textContent=editing
-    ?"Mode atur: ubah urutan, sembunyikan, edit, atau hapus."
+    ?"Mode atur: ubah urutan, edit, atau hapus AI mana pun."
     :"Ketuk salah satu AI. Situsnya terbuka penuh layar. Tekan X atau tombol kembali untuk pulang ke sini.";
   $("editbtn").textContent=editing?"Selesai":"Atur";
   $("editbtn").setAttribute("aria-pressed",editing);
   $("resetbtn").style.display=editing?"block":"none";
-  if(!shown.length){box.appendChild(mk("p","empty","Semua AI disembunyikan. Tekan Atur untuk menampilkannya lagi."));return}
-
+  if(!shown.length){
+    box.appendChild(mk("p","empty","Daftar kosong. Tambah AI di bawah, atau tekan Atur lalu Pulihkan AI bawaan."));
+    return;
+  }
   shown.forEach(function(a,idx){
-    var row=mk("div","row"+(editing&&isHidden(a)?" hidden-item":""));
+    var row=mk("div","row");
     var main=mk("div","main");
     var b=mk("button","item");
     var d=mk("span","dot",a.n.charAt(0).toUpperCase());d.style.background=a.c||COLORS[0];
@@ -202,15 +195,9 @@ function render(){
       var tools=mk("div","tools");
       var up=mk("button","sq","▲");up.setAttribute("aria-label","Naikkan "+a.n);up.disabled=idx===0;up.onclick=function(){move(a.id,-1)};
       var dn=mk("button","sq","▼");dn.setAttribute("aria-label","Turunkan "+a.n);dn.disabled=idx===shown.length-1;dn.onclick=function(){move(a.id,1)};
-      tools.appendChild(up);tools.appendChild(dn);
-      if(isCustom(a)){
-        var ed=mk("button",null,"Edit");ed.onclick=function(){startEdit(a)};
-        var del=mk("button","danger","Hapus");del.setAttribute("aria-label","Hapus "+a.n);del.onclick=function(){remove(a)};
-        tools.appendChild(ed);tools.appendChild(del);
-      }else{
-        var hd=mk("button",null,isHidden(a)?"Tampilkan":"Sembunyikan");hd.onclick=function(){toggleHidden(a)};
-        tools.appendChild(hd);
-      }
+      var ed=mk("button",null,"Edit");ed.onclick=function(){startEdit(a)};
+      var del=mk("button","danger","Hapus");del.setAttribute("aria-label","Hapus "+a.n);del.onclick=function(){remove(a)};
+      tools.appendChild(up);tools.appendChild(dn);tools.appendChild(ed);tools.appendChild(del);
       row.appendChild(tools);
     }
     box.appendChild(row);
@@ -252,24 +239,28 @@ $("addbtn").onclick=function(){
   var parsed;
   try{parsed=new URL(u)}catch(e){m.textContent="Alamat situs tidak valid.";return}
   if(parsed.hostname.indexOf(".")<1){m.textContent="Alamat situs tidak valid.";return}
-  var dup=everything().some(function(a){
+  var dup=state.items.some(function(a){
     return a.id!==editId&&(a.n.toLowerCase()===n.toLowerCase()||norm(a.u)===norm(u));
   });
   if(dup){m.textContent="Nama atau alamat itu sudah ada di daftar.";return}
   if(editId){
-    state.custom=state.custom.map(function(x){return x.id===editId?{id:x.id,n:n,u:u,c:color}:x});
+    state.items=state.items.map(function(x){return x.id===editId?{id:x.id,n:n,u:u,c:color}:x});
   }else{
-    state.custom.push({id:"c:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:n,u:u,c:color});
+    state.items.push({id:"c:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:n,u:u,c:color});
   }
   save();resetForm();render();
 };
 $("cancelbtn").onclick=resetForm;
 ["n","u"].forEach(function(id){$(id).oninput=function(){$("msg").textContent=""}});
 
-$("editbtn").onclick=function(){editing=!editing;if(!editing)resetForm();render()};
+$("editbtn").onclick=function(){editing=!editing;note("");if(!editing)resetForm();render()};
 $("resetbtn").onclick=function(){
-  if(!confirm("Kembalikan urutan dan tampilan semua AI ke bawaan? AI yang kamu tambahkan tidak dihapus."))return;
-  state.order=[];state.hidden=[];save();render();
+  var have={};state.items.forEach(function(a){have[a.id]=1});
+  var missing=DEFAULTS.filter(function(a){return !have[a.id]});
+  if(!missing.length){note("Semua AI bawaan masih ada di daftar.");return}
+  if(!confirm("Tambahkan kembali "+missing.length+" AI bawaan yang terhapus?"))return;
+  missing.forEach(function(a){state.items.push(clone(a))});
+  note("");save();render();
 };
 
 /* ---------- status bar mengikuti tema ---------- */

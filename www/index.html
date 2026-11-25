@@ -90,7 +90,11 @@ function all(){return DEFAULTS.concat(custom.map(function(x){x.custom=true;x.c=x
 function find(n){return all().filter(function(a){return a.n===n})[0]}
 
 var C=window.Capacitor;
-var IB=C&&C.Plugins&&C.Plugins.InAppBrowser;
+var IB=null,NATIVE=!!(C&&C.isNativePlatform&&C.isNativePlatform());
+if(NATIVE){
+  try{IB=C.registerPlugin?C.registerPlugin("InAppBrowser"):(C.Plugins&&C.Plugins.InAppBrowser)}
+  catch(e){IB=C.Plugins&&C.Plugins.InAppBrowser}
+}
 
 function rect(){
   var r=$("stage").getBoundingClientRect();
@@ -122,7 +126,7 @@ function select(a){
   renderChips();
   if(!IB){
     $("hint").classList.remove("hide");
-    $("hint").textContent="Pratinjau ini hanya jalan di aplikasi Android. Membuka "+a.n+" di tab baru.";
+    $("hint").textContent="Jendela tertanam hanya jalan di aplikasi Android. Membuka "+a.n+" di tab baru.";
     window.open(a.u,"_blank");
     return;
   }
@@ -130,6 +134,7 @@ function select(a){
   hideAll(a.n);
   if(views[a.n]){safe(IB.show({id:views[a.n]}));return}
   var d=rect();
+  lastD=d;
   IB.openWebView({
     url:a.u,x:d.x,y:d.y,width:d.width,height:d.height,
     toolbarType:"blank",enabledSafeTopMargin:false,enabledSafeBottomMargin:false,title:a.n
@@ -198,12 +203,19 @@ $("addbtn").onclick=function(){
 ["n","u"].forEach(function(id){$(id).oninput=function(){$("msg").textContent=""}});
 
 // Ikuti perubahan ukuran area (putar layar, dll.)
+var lastD=null,rlTimer=null;
 function relayout(){
   if(!IB)return;
-  var d=rect();
-  Object.keys(views).forEach(function(n){
-    safe(IB.updateDimensions({id:views[n],x:d.x,y:d.y,width:d.width,height:d.height}));
-  });
+  clearTimeout(rlTimer);
+  // Tunggu ukuran stabil, dan abaikan penyusutan tinggi akibat keyboard (itu penyebab tampilan dobel).
+  rlTimer=setTimeout(function(){
+    var d=rect();
+    if(lastD&&Math.abs(d.width-lastD.width)<=2&&Math.abs(d.x-lastD.x)<=2&&Math.abs(d.y-lastD.y)<=2&&d.height<=lastD.height+2)return;
+    lastD=d;
+    Object.keys(views).forEach(function(n){
+      safe(IB.updateDimensions({id:views[n],x:d.x,y:d.y,width:d.width,height:d.height}));
+    });
+  },250);
 }
 if(window.ResizeObserver){new ResizeObserver(relayout).observe($("stage"))}
 window.addEventListener("resize",relayout);

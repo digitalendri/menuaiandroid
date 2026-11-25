@@ -1,0 +1,14 @@
+{
+  "name": "menuai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Menu AI: daftar AI yang dibuka lewat Chrome Custom Tab",
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}

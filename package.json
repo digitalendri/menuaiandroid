@@ -1,6 +1,6 @@
 {
   "name": "menuai",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Menu AI: daftar AI yang dibuka lewat Chrome Custom Tab",
   "scripts": {
@@ -13,7 +13,8 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/preferences": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
-    "@capacitor/status-bar": "^8.0.0"
+    "@capacitor/status-bar": "^8.0.0",
+    "@capgo/capacitor-inappbrowser": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^4.0.0",

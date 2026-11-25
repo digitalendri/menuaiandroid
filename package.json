@@ -1,14 +1,22 @@
 {
   "name": "menuai",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Menu AI: daftar AI yang dibuka lewat Chrome Custom Tab",
+  "scripts": {
+    "assets": "capacitor-assets generate --android",
+    "sync": "cap sync android"
+  },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
     "@capacitor/browser": "^8.0.0",
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.0.0"
   }
 }

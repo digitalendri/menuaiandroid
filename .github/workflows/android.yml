@@ -31,6 +31,14 @@ jobs:
           npx capacitor-assets generate --android || echo "Lewati ikon: assets tidak lengkap"
           npx cap sync android
 
+      - name: Izin mikrofon dan kamera (untuk input suara di situs AI)
+        run: |
+          F=android/app/src/main/AndroidManifest.xml
+          for P in RECORD_AUDIO MODIFY_AUDIO_SETTINGS CAMERA; do
+            grep -q "android.permission.$P" "$F" || sed -i "s#</manifest>#    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>#" "$F"
+          done
+          grep -n "uses-permission" "$F"
+
       - name: Pakai debug keystore tetap (opsional)
         env:
           KS: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}

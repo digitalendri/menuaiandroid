@@ -261,7 +261,7 @@ function renderSheet(){
     row.setAttribute("data-id",a.id);
     var gp=document.createElement("div");gp.className="grip";gp.innerHTML="&#8801;";
     gp.setAttribute("role","button");gp.setAttribute("aria-label","Geser untuk mengubah urutan "+a.n);
-    gp.onpointerdown=function(e){startDrag(e,row,gp)};
+    gp.onpointerdown=startDrag;
     row.appendChild(gp);
     var it=document.createElement("div");it.className="sitem";
     var d=document.createElement("span");d.className="sdot";d.style.background=a.c;d.textContent=a.n.charAt(0).toUpperCase();
@@ -280,41 +280,52 @@ function renderSheet(){
 }
 
 // Geser urutan: tahan tombol ≡, seret ke atas/bawah, lepas untuk menyimpan.
-function startDrag(e,row,handle){
+// Yang dipindahkan adalah baris lain, bukan baris yang disentuh, supaya sentuhan tidak terputus.
+function startDrag(e){
   if(e.button!==undefined&&e.button!==0)return;
   e.preventDefault();
-  var box=$("slist"),sheet=$("sheet"),y=e.clientY,timer=null;
-  try{handle.setPointerCapture(e.pointerId)}catch(x){}
+  var row=e.currentTarget.parentNode,box=$("slist"),sheet=$("sheet");
+  var pid=e.pointerId,y=e.clientY,timer=null,done=false;
   row.classList.add("drag");
+  sheet.style.userSelect=sheet.style.webkitUserSelect="none";
   function rows(){return Array.prototype.slice.call(box.querySelectorAll(".srow"))}
   function place(){
-    var others=rows().filter(function(r){return r!==row}),ref=null;
-    for(var i=0;i<others.length;i++){
-      var b=others[i].getBoundingClientRect();
-      if(y<b.top+b.height/2){ref=others[i];break}
+    var all=rows(),cur=all.indexOf(row),idx=0,i;
+    for(i=0;i<all.length;i++){
+      if(all[i]===row)continue;
+      var b=all[i].getBoundingClientRect();
+      if(y>b.top+b.height/2)idx++;
     }
-    if(ref){if(row.nextElementSibling!==ref)box.insertBefore(row,ref)}
-    else if(box.lastElementChild!==row)box.appendChild(row);
+    if(idx<cur){for(i=cur-1;i>=idx;i--)box.insertBefore(all[i],row.nextSibling)}
+    else if(idx>cur){for(i=cur+1;i<=idx;i++)box.insertBefore(all[i],row)}
   }
-  function tick(){
-    var h=window.innerHeight;
-    if(y<90)sheet.scrollTop-=10;else if(y>h-90)sheet.scrollTop+=10;
-    place();
+  function move(ev){
+    if(ev.pointerId!==pid)return;
+    if(ev.pointerType==="mouse"&&ev.buttons===0){end(ev);return}
+    y=ev.clientY;place();
   }
-  function move(ev){y=ev.clientY;place()}
-  function end(){
-    clearInterval(timer);
-    handle.onpointermove=handle.onpointerup=handle.onpointercancel=null;
+  function end(ev){
+    if(done||(ev&&ev.pointerId!==undefined&&ev.pointerId!==pid))return;
+    done=true;clearInterval(timer);
+    window.removeEventListener("pointermove",move);
+    window.removeEventListener("pointerup",end);
+    window.removeEventListener("pointercancel",end);
+    sheet.style.userSelect=sheet.style.webkitUserSelect="";
     row.classList.remove("drag");
     var order=rows().map(function(r){return r.getAttribute("data-id")});
     var next=order.map(byId).filter(Boolean);
     if(next.length===list.length){list=next;save()}
     renderSheet();renderChips();
   }
-  handle.onpointermove=move;
-  handle.onpointerup=end;
-  handle.onpointercancel=end;
-  timer=setInterval(tick,16);
+  window.addEventListener("pointermove",move);
+  window.addEventListener("pointerup",end);
+  window.addEventListener("pointercancel",end);
+  // Gulung otomatis hanya saat jari dekat tepi layar, dan baris dicek ulang hanya kalau gulungannya bergerak.
+  timer=setInterval(function(){
+    var r=sheet.getBoundingClientRect(),before=sheet.scrollTop;
+    if(y<r.top+80)sheet.scrollTop-=8;else if(y>r.bottom-80)sheet.scrollTop+=8;
+    if(sheet.scrollTop!==before)place();
+  },16);
 }
 
 function startEdit(a){

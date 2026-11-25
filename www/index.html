@@ -71,16 +71,27 @@ input[type=text],input:not([type]){font:inherit;color:var(--ink);background:var(
 .note{margin-top:18px;font-size:13px;color:var(--mute)}
 .empty{color:var(--mute);font-size:14px;padding:12px 2px}
 .reset{margin-top:14px;width:100%}
+html,body{height:100%}
+.acts{display:flex;gap:8px}
+.acts .ext{display:none;font-size:14px;padding:0 14px}
+#slot{display:none}
+body.embed{overflow:hidden;padding-bottom:max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px))}
+body.embed .wrap{height:100%;display:flex;flex-direction:column}
+body.embed .sub,body.embed .add,body.embed .reset,body.embed .note,body.embed #list{display:none}
+body.embed .nav{margin-bottom:8px}
+body.embed .acts .ext{display:inline-block}
+body.embed #slot{display:grid;place-items:center;text-align:center;padding:0 24px;flex:1;min-height:0;margin:0 -16px;background:var(--panel);color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <h1>Menu AI</h1>
-    <button class="link" id="editbtn" aria-pressed="false">Atur</button>
+    <div class="acts"><button class="link ext" id="extbtn" aria-label="Buka di Chrome">Chrome</button><button class="link" id="editbtn" aria-pressed="false">Atur</button></div>
   </div>
   <p class="sub" id="sub"></p>
   <nav class="nav" id="nav" aria-label="Daftar AI"></nav>
+  <div id="slot">Memuat…</div>
   <div id="list"></div>
 
   <details class="add" id="addbox">
@@ -185,6 +196,7 @@ function move(id,dir){
 }
 function remove(a){
   if(!confirm("Hapus "+a.n+" dari daftar?"))return;
+  dropView(a.id);
   state.items=state.items.filter(function(c){return c.id!==a.id});
   if(editId===a.id)resetForm();
   save();render();
@@ -193,7 +205,7 @@ function remove(a){
 function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 function host(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
 
-var sel=null;
+var sel=null;try{sel=localStorage.getItem("menuai.sel")}catch(e){}
 function current(){
   var a=null;state.items.forEach(function(x){if(x.id===sel)a=x});
   if(!a&&state.items.length){a=state.items[0];sel=a.id}
@@ -216,6 +228,9 @@ function pick(id){
   [].forEach.call(nav.children,function(c){c.classList.toggle("on",c.dataset.id===id)});
   toView(nav.querySelector(".on"));
   paintStage();
+  active=id;
+  try{localStorage.setItem("menuai.sel",id)}catch(e){}
+  showEmbed(current());
 }
 function paintStage(){
   var box=$("list");box.innerHTML="";box.className="stage";
@@ -231,6 +246,46 @@ function paintStage(){
   body.appendChild(go);card.appendChild(hero);card.appendChild(body);box.appendChild(card);
 }
 
+/* ---------- chat tertanam: WebView native di bawah navbar ---------- */
+var IAB=plug("InAppBrowser"),EMBED=!!IAB,SCALE=1,views={},active=null,rt=null;
+function embedOn(){return EMBED&&!editing&&state.items.length>0}
+function rect(){
+  var r=$("slot").getBoundingClientRect();
+  return{x:Math.round(r.left*SCALE),y:Math.round(r.top*SCALE),width:Math.round(r.width*SCALE),height:Math.round(r.height*SCALE)};
+}
+function real(id){return views[id]&&views[id]!=="pending"}
+function hideAll(except){Object.keys(views).forEach(function(id){if(id!==except&&real(id))safe(IAB.hide({id:views[id]}))})}
+function dropView(id){
+  if(real(id))safe(IAB.close({id:views[id]}));
+  delete views[id];
+}
+function showEmbed(a){
+  if(!embedOn()||!a)return;
+  hideAll(a.id);
+  var r=rect(),cur=views[a.id];
+  if(cur==="pending")return;
+  if(cur){safe(IAB.updateDimensions({id:cur,x:r.x,y:r.y,width:r.width,height:r.height}));safe(IAB.show({id:cur}));return}
+  views[a.id]="pending";
+  $("slot").textContent="Memuat "+a.n+"…";
+  IAB.openWebView({url:a.u,toolbarType:"blank",openBlankTargetInWebView:true,activeNativeNavigationForWebview:true,persistWebViewData:true,
+    x:r.x,y:r.y,width:r.width,height:r.height})
+  .then(function(res){
+    if(views[a.id]!=="pending"){safe(IAB.close({id:res.id}));return}
+    views[a.id]=res.id;
+    if(!embedOn()||active!==a.id)safe(IAB.hide({id:res.id}));
+  }).catch(function(){
+    delete views[a.id];
+    $("slot").textContent="Chat tidak bisa ditampilkan di dalam app. Ketuk tombol Chrome di atas untuk membukanya di browser.";
+  });
+}
+window.addEventListener("resize",function(){
+  clearTimeout(rt);
+  rt=setTimeout(function(){
+    if(!embedOn()||!real(active))return;
+    var r=rect();safe(IAB.updateDimensions({id:views[active],x:r.x,y:r.y,width:r.width,height:r.height}));
+  },150);
+});
+
 function render(){
   var box=$("list");box.innerHTML="";
   $("sub").textContent=editing
@@ -240,13 +295,19 @@ function render(){
   $("editbtn").setAttribute("aria-pressed",editing);
   $("resetbtn").style.display=editing?"block":"none";
   var shown=state.items;
+  document.body.classList.toggle("embed",embedOn());
+  if(EMBED&&!embedOn())hideAll(null);
   $("nav").style.display=(editing||!shown.length)?"none":"flex";
   if(!shown.length){
     box.className="edit";
     box.appendChild(mk("p","empty","Daftar kosong. Tambah AI di bawah, atau tekan Atur lalu Pulihkan AI bawaan."));
     return;
   }
-  if(!editing){current();paintNav();paintStage();return}
+  if(!editing){
+    current();paintNav();paintStage();active=sel;
+    if(embedOn())requestAnimationFrame(function(){showEmbed(current())});
+    return;
+  }
 
   box.className="edit";
   shown.forEach(function(a,idx){
@@ -310,6 +371,7 @@ $("addbtn").onclick=function(){
   });
   if(dup){m.textContent="Nama atau alamat itu sudah ada di daftar.";return}
   if(editId){
+    state.items.forEach(function(x){if(x.id===editId&&x.u!==u)dropView(editId)});
     state.items=state.items.map(function(x){return x.id===editId?{id:x.id,n:n,u:u,c:color}:x});
   }else{
     state.items.push({id:"c:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:n,u:u,c:color});
@@ -317,6 +379,7 @@ $("addbtn").onclick=function(){
   save();resetForm();render();
 };
 $("cancelbtn").onclick=resetForm;
+$("extbtn").onclick=function(){var a=current();if(a)openAI(a)};
 ["n","u"].forEach(function(id){$(id).oninput=function(){$("msg").textContent=""}});
 
 $("editbtn").onclick=function(){editing=!editing;note("");if(!editing)resetForm();render()};

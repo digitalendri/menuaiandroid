@@ -71,7 +71,6 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
 <div class="top">
   <div class="head">
     <h1>Menu AI</h1>
-    <button class="tool" id="swap" aria-label="Ganti akun">&#8644;</button>
     <button class="tool" id="reload" aria-label="Muat ulang">&#8635;</button>
     <button class="atur" id="prm">Prompt</button>
     <button class="atur" id="atur">Atur</button>
@@ -90,6 +89,7 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
     <input id="n" placeholder="Nama, misalnya Mistral" aria-label="Nama AI">
     <input id="u" placeholder="chat.mistral.ai" aria-label="Alamat situs" inputmode="url" autocapitalize="none">
     <div class="crow"><input type="color" id="c" value="#6b7a76" aria-label="Warna"><span>Warna tombol</span></div>
+    <label class="crow"><input type="checkbox" id="pf" style="width:24px;height:24px;min-height:0;padding:0"><span>Login terpisah (untuk beberapa akun di satu situs)</span></label>
     <p class="msg" id="msg"></p>
     <div class="btns">
       <button class="btn ghost hide" id="cancel">Batal</button>
@@ -145,7 +145,7 @@ var active=null,views={},opening={},sheetOpen=false,editId=null;
 function $(id){return document.getElementById(id)}
 function uid(){return "a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function valid(x){return x&&typeof x.n==="string"&&typeof x.u==="string"}
-function fresh(x){return {id:x.id||uid(),n:x.n,u:x.u,c:x.c||"#6b7a76"}}
+function fresh(x){return {id:x.id||uid(),n:x.n,u:x.u,c:x.c||"#6b7a76",p:!!x.p}}
 
 // Seluruh daftar (bawaan + tambahan) disimpan sebagai satu daftar supaya semuanya bisa diubah/dihapus.
 // Daftar tambahan dari versi lama (menuai.custom) otomatis ikut dipindahkan.
@@ -196,47 +196,6 @@ function renderChips(){
   });
 }
 
-// ---- Tukar sesi antar akun di situs yang sama (mis. Dola 1 dan Dola 2) ----
-// Semua jendela berbagi satu penyimpanan cookie, jadi saat pindah akun: cookie akun lama
-// disimpan, dihapus dari jendela, lalu cookie akun baru dipasang. Hanya cookie yang ditukar.
-var OWN="menuai.owner",SESS="menuai.sess.",swapping=false;
-var CK=null;
-if(NATIVE){try{CK=(C.Plugins&&C.Plugins.CapacitorCookies)||(C.registerPlugin&&C.registerPlugin("CapacitorCookies"))}catch(e){CK=null}}
-function run(fn){try{return Promise.resolve(fn())}catch(e){return Promise.reject(e)}}
-function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
-function getOwner(){try{return JSON.parse(localStorage.getItem(OWN)||"{}")||{}}catch(e){return {}}}
-function setOwner(h,id){var o=getOwner();o[h]=id;try{localStorage.setItem(OWN,JSON.stringify(o))}catch(e){}}
-function sessionSwap(from,to){
-  var info={saved:0,set:0,had:false},fid=views[from.id];
-  return run(function(){return IB.getCookies({url:from.u,includeHttpOnly:true})}).then(function(r){
-    var c=(r&&r.cookies)?r.cookies:r;
-    if(c&&typeof c==="object"){
-      info.saved=Object.keys(c).length;
-      try{localStorage.setItem(SESS+from.id,JSON.stringify(c))}catch(e){}
-    }
-  }).catch(function(){})
-  .then(function(){
-    if(!fid)return;
-    return run(function(){return IB.executeScript({id:fid,code:"try{localStorage.clear();sessionStorage.clear()}catch(e){}"})}).catch(function(){});
-  })
-  .then(function(){
-    return run(function(){return IB.clearCookies({url:from.u,id:fid})})
-      .catch(function(){return run(function(){return IB.clearCookies({url:from.u})})}).catch(function(){});
-  })
-  .then(function(){
-    closeView(from.id);
-    var c=null;try{c=JSON.parse(localStorage.getItem(SESS+to.id)||"null")}catch(e){}
-    if(!c)return;
-    info.had=true;
-    if(!CK)return;
-    var exp=new Date(Date.now()+365*864e5).toUTCString();
-    return Promise.all(Object.keys(c).map(function(k){
-      return run(function(){return CK.setCookie({url:to.u,key:k,value:c[k],expires:exp,path:"/"})}).then(function(){info.set++},function(){});
-    }));
-  })
-  .then(function(){return info});
-}
-
 function hideAll(except){
   if(!IB)return;
   Object.keys(views).forEach(function(id){if(id!==except)safe(IB.hide({id:views[id]}))});
@@ -258,28 +217,13 @@ function select(a){
   $("hint").classList.add("hide");
   hideAll(a.id);
   if(views[a.id]){safe(IB.show({id:views[a.id]}));return}
-  if(opening[a.id]||swapping)return;
-  var h=hostOf(a.u),oid=getOwner()[h],other=(oid&&oid!==a.id)?byId(oid):null;
-  if(other&&hostOf(other.u)!==h)other=null;
-  if(other){
-    swapping=true;toast("Menukar sesi ke "+a.n+"…",8000);
-    sessionSwap(other,a).then(function(info){
-      swapping=false;setOwner(h,a.id);
-      var m="Sesi "+other.n+" disimpan ("+info.saved+" cookie). ";
-      m+=!info.had?a.n+" belum punya sesi tersimpan, silakan login."
-        :(CK?a.n+": "+info.set+" cookie dipasang.":"Cookie "+a.n+" tidak bisa dipasang.");
-      toast(m,5000);
-      if(active&&active.id===a.id&&!sheetOpen)select(a);
-    });
-    return;
-  }
-  setOwner(h,a.id);
+  if(opening[a.id])return;
   opening[a.id]=true;
   var d=rect(),url=a.u;
   lastD=d;
   IB.openWebView({
     url:url,x:d.x,y:d.y,width:d.width,height:d.height,
-    toolbarType:"blank",enabledSafeTopMargin:false,enabledSafeBottomMargin:false,title:a.n
+    toolbarType:"blank",enabledSafeTopMargin:false,enabledSafeBottomMargin:false,title:a.p?"menuai-profile:"+a.id:a.n
   }).then(function(r){
     delete opening[a.id];
     var cur=byId(a.id);
@@ -307,31 +251,6 @@ $("reload").onclick=function(){
     });
 };
 
-// Ganti akun: hapus sesi login situs AI yang aktif, lalu buka ulang.
-// Akun Google tetap diingat, jadi tinggal pilih akun lain di halaman login.
-$("swap").onclick=function(){
-  if(!IB){toast("Ganti akun hanya jalan di aplikasi Android.");return}
-  if(!active){toast("Pilih AI dulu.");return}
-  var a=active,id=views[a.id];
-  if(!confirm("Keluar dari "+a.n+" supaya bisa memilih akun lain?"))return;
-  function run(fn){try{return Promise.resolve(fn())}catch(e){return Promise.reject(e)}}
-  var chain=Promise.resolve();
-  if(id){
-    chain=chain.then(function(){
-      return run(function(){return IB.executeScript({id:id,code:"try{localStorage.clear();sessionStorage.clear()}catch(e){}"})}).catch(function(){});
-    });
-  }
-  chain=chain.then(function(){
-    return run(function(){return IB.clearCookies({url:a.u,id:id})})
-      .catch(function(){return run(function(){return IB.clearCookies({url:a.u})})});
-  }).then(function(){return true},function(){return false});
-  chain.then(function(ok){
-    closeView(a.id);
-    if(active&&active.id===a.id&&!sheetOpen)select(a);
-    toast(ok?"Sesi "+a.n+" dihapus. Pilih akun di halaman login.":"Sesi mungkin belum terhapus. Coba cek halamannya.");
-  });
-};
-
 // ---- Atur ----
 function renderSheet(){
   var box=$("slist");box.innerHTML="";
@@ -350,7 +269,7 @@ function renderSheet(){
     var d=document.createElement("span");d.className="sdot";d.style.background=a.c;d.textContent=a.n.charAt(0).toUpperCase();
     var t=document.createElement("div");t.style.minWidth="0";
     var nm=document.createElement("div");nm.className="sname";nm.textContent=a.n;
-    var ur=document.createElement("div");ur.className="surl";ur.textContent=a.u.replace(/^https?:\/\//,"");
+    var ur=document.createElement("div");ur.className="surl";ur.textContent=a.u.replace(/^https?:\/\//,"")+(a.p?" (login terpisah)":"");
     t.appendChild(nm);t.appendChild(ur);it.appendChild(d);it.appendChild(t);row.appendChild(it);
 
     var ed=document.createElement("button");ed.className="act edit";ed.textContent="Ubah";
@@ -413,7 +332,7 @@ function startDrag(e){
 
 function startEdit(a){
   editId=a.id;
-  $("n").value=a.n;$("u").value=a.u;$("c").value=a.c;$("msg").textContent="";
+  $("n").value=a.n;$("u").value=a.u;$("c").value=a.c;$("pf").checked=!!a.p;$("msg").textContent="";
   $("ftitle").textContent="Ubah "+a.n;
   $("addbtn").textContent="Simpan perubahan";
   $("cancel").classList.remove("hide");
@@ -422,7 +341,7 @@ function startEdit(a){
 }
 function cancelEdit(){
   editId=null;
-  $("n").value="";$("u").value="";$("c").value="#6b7a76";$("msg").textContent="";
+  $("n").value="";$("u").value="";$("c").value="#6b7a76";$("pf").checked=false;$("msg").textContent="";
   $("ftitle").textContent="Tambah AI";
   $("addbtn").textContent="Tambah ke daftar";
   $("cancel").classList.add("hide");
@@ -431,7 +350,6 @@ function cancelEdit(){
 function remove(a){
   if(!confirm("Hapus "+a.n+" dari daftar?"))return;
   list=list.filter(function(x){return x.id!==a.id});save();
-  try{localStorage.removeItem(SESS+a.id)}catch(e){}
   closeView(a.id);
   if(active&&active.id===a.id)active=null;
   if(editId===a.id)cancelEdit();
@@ -458,7 +376,7 @@ $("done").onclick=closeSheet;
 $("cancel").onclick=function(){cancelEdit();renderSheet()};
 
 $("addbtn").onclick=function(){
-  var n=$("n").value.trim(),u=$("u").value.trim(),c=$("c").value||"#6b7a76",m=$("msg");
+  var n=$("n").value.trim(),u=$("u").value.trim(),c=$("c").value||"#6b7a76",pf=$("pf").checked,m=$("msg");
   if(!n){m.textContent="Isi nama AI dulu.";return}
   if(!u){m.textContent="Isi alamat situsnya.";return}
   var dup=list.some(function(x){return x.id!==editId&&x.n.toLowerCase()===n.toLowerCase()});
@@ -469,11 +387,11 @@ $("addbtn").onclick=function(){
   if(editId){
     var a=byId(editId);
     if(a){
-      if(a.u!==u)closeView(a.id); // jendela lama dibuang, dibuka ulang dengan alamat baru
-      a.n=n;a.u=u;a.c=c;
+      if(a.u!==u||!!a.p!==pf)closeView(a.id); // jendela lama dibuang, dibuka ulang dengan pengaturan baru
+      a.n=n;a.u=u;a.c=c;a.p=pf;
     }
   }else{
-    list.push({id:uid(),n:n,u:u,c:c});
+    list.push({id:uid(),n:n,u:u,c:c,p:pf});
   }
   save();cancelEdit();renderSheet();renderChips();
 };
@@ -482,7 +400,6 @@ $("addbtn").onclick=function(){
 $("reset").onclick=function(){
   if(!confirm("Kembalikan daftar ke bawaan? AI tambahan dan semua perubahan akan hilang."))return;
   Object.keys(views).forEach(closeView);
-  try{list.forEach(function(a){localStorage.removeItem(SESS+a.id)});localStorage.removeItem(OWN)}catch(e){}
   list=DEFAULTS.map(fresh);save();
   active=null;cancelEdit();renderSheet();renderChips();
 };

@@ -3,409 +3,213 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
 <title>Menu AI</title>
 <style>
-:root{--bg:#eceff5;--panel:#fff;--ink:#12161f;--mute:#5f6878;--line:#d9deea;--acc:#0e7c66;--accbg:#d6efe8;--danger:#b3261e;--glow:rgba(14,124,102,.20)}
-@media (prefers-color-scheme:dark){:root{--bg:#101320;--panel:#191d2c;--ink:#eef1f8;--mute:#98a1b6;--line:#2a3045;--acc:#4fd1b3;--accbg:#1f3a3c;--danger:#f2877f;--glow:rgba(79,209,179,.16)}}
+:root{--bg:#eceff7;--panel:#fff;--ink:#12161f;--mute:#5d6678;--line:#dde2ee;--acc:#0e7c66;--danger:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#10141c;--panel:#1a2030;--ink:#eef1f8;--mute:#9aa4ba;--line:#2a3247;--acc:#4fd1b3;--danger:#f2877f}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;min-height:100%}
-body{background:radial-gradient(130% 50% at 100% -8%,var(--glow),transparent 62%),var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  padding:calc(max(env(safe-area-inset-top,0px),var(--safe-area-inset-top,0px)) + 22px) 16px calc(max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px)) + 28px)}
-.wrap{max-width:560px;margin:0 auto}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
-h1{font-size:36px;line-height:1.05;font-weight:800;letter-spacing:-.035em;margin:0}
-.link{font:inherit;font-size:15px;font-weight:700;color:var(--acc);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:0 20px;min-height:44px}
-.link[aria-pressed=true]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
-.sub{margin:0 0 20px;color:var(--mute);font-size:14px;max-width:34ch}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+.top{padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px}
+.head{display:flex;align-items:center;gap:8px}
+h1{font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin:0 auto 0 0}
+.tool{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:19px;display:grid;place-items:center;padding:0}
+.atur{height:42px;padding:0 20px;border-radius:21px;border:1px solid var(--line);background:var(--panel);color:var(--acc);font:inherit;font-weight:700}
+.tool:active,.atur:active{opacity:.7}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:22px;padding:0 18px;height:44px;font:inherit;font-weight:700;font-size:15px}
+.chip.on{color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(0,0,0,.22);
+  background-image:linear-gradient(135deg,rgba(255,255,255,.18),rgba(0,0,0,.28))}
+#stage{flex:1;min-height:0;margin:6px 0 0;position:relative;background:var(--panel);border-top:1px solid var(--line)}
+.hint{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--mute)}
+.hide{display:none!important}
 
-#list.edit .row{margin-bottom:10px}
-.main{display:flex;align-items:stretch}
-.item{flex:1;display:flex;align-items:center;gap:14px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-left:6px solid var(--c,var(--acc));border-radius:16px;background:var(--panel);color:var(--ink);font:inherit;font-size:17px;text-align:left;min-height:60px;width:100%}
-.item span.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
-.item small{display:block;font-weight:400;font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.txt{min-width:0;display:block}
-.dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0}
-
-/* navbar daftar AI */
-.nav{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 16px;padding:2px 16px 8px;scroll-snap-type:x proximity;scrollbar-width:none}
-.nav::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;scroll-snap-align:center;font:inherit;font-size:15px;font-weight:700;min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
-.chip.on{border-color:transparent;color:#fff;background:var(--c);background:linear-gradient(158deg,var(--c) 15%,color-mix(in srgb,var(--c) 60%,#000));box-shadow:0 8px 16px -10px var(--c)}
-
-/* panel jendela chat di bawah navbar */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:26px;overflow:hidden;box-shadow:0 18px 34px -22px rgba(10,15,30,.5)}
-.hero{position:relative;height:208px;overflow:hidden;background:var(--c);background:linear-gradient(158deg,var(--c) 15%,color-mix(in srgb,var(--c) 55%,#000))}
-.hero .big{position:absolute;right:-8px;top:-30px;font-size:190px;line-height:1;font-weight:800;color:rgba(255,255,255,.2);letter-spacing:-.05em}
-.bub{position:absolute;height:34px;border-radius:17px;background:rgba(255,255,255,.28)}
-.bub.l{left:18px;top:26px;width:46%;border-bottom-left-radius:6px}
-.bub.r{right:18px;top:74px;width:58%;background:rgba(255,255,255,.5);border-bottom-right-radius:6px}
-.typing{position:absolute;left:18px;right:18px;bottom:18px;height:40px;border-radius:20px;background:rgba(255,255,255,.9)}
-.typing::after{content:"";position:absolute;right:6px;top:6px;width:28px;height:28px;border-radius:50%;background:var(--c)}
-.cbody{padding:18px 18px 20px;display:grid;gap:12px;justify-items:start}
-.cbody h2{margin:0;font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.03em}
-.badge{font-size:13px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:2px 12px}
-.btn.go{width:100%;font-size:17px;min-height:54px;border-radius:16px;color:#fff;background:var(--c);background:color-mix(in srgb,var(--c) 82%,#000)}
-.btn.go:active{filter:brightness(.92)}
-.empty{grid-column:1/-1}
-@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
-.pop{animation:pop .32s cubic-bezier(.2,.8,.2,1) both}
-@media (prefers-reduced-motion:reduce){.pop{animation:none}}
-
-.tools{display:flex;gap:8px;margin-top:6px}
-.tools button{flex:1;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;min-height:44px;padding:0 8px}
-.tools button.sq{flex:0 0 48px}
-.tools button.danger{color:var(--danger)}
-.tools button:disabled{opacity:.35}
-.tools button:active{background:var(--accbg)}
-.add{margin-top:24px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:0}
-.add summary{padding:16px;font-weight:700;cursor:pointer;min-height:56px;display:flex;align-items:center}
-.form{display:grid;gap:10px;padding:0 16px 16px}
-input[type=text],input:not([type]){font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:48px;width:100%}
-.colors{display:flex;gap:10px;flex-wrap:wrap}
-.colors button{width:40px;height:40px;border-radius:50%;border:3px solid transparent;padding:0}
-.colors button[aria-pressed=true]{border-color:var(--ink)}
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);overflow-y:auto}
+.sheet h2{margin:0 0 12px;font-size:22px}
+.srow{display:flex;gap:8px;margin-bottom:8px}
+.sitem{flex:1;display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);min-width:0}
+.sdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0}
+.sname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.surl{font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del{border:1px solid var(--line);background:var(--panel);color:var(--danger);border-radius:14px;padding:0 14px;font:inherit;font-size:14px}
+.form{display:grid;gap:10px;margin-top:14px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.form b{font-size:15px}
+input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}
 .btn{font:inherit;font-weight:700;border:0;border-radius:12px;background:var(--acc);color:var(--bg);padding:12px 16px;min-height:48px}
-.btn.alt{background:none;color:var(--mute);border:1px solid var(--line)}
+.btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
 .msg{margin:0;font-size:13px;color:var(--danger);min-height:18px}
-.note{margin-top:18px;font-size:13px;color:var(--mute)}
-.empty{color:var(--mute);font-size:14px;padding:12px 2px}
-.reset{margin-top:14px;width:100%}
-html,body{height:100%}
-.acts{display:flex;gap:8px}
-.acts .ext{display:none;font-size:14px;padding:0 14px}
-#slot{display:none}
-body.embed{overflow:hidden;padding-bottom:max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px))}
-body.embed .wrap{height:100%;display:flex;flex-direction:column}
-body.embed .sub,body.embed .add,body.embed .reset,body.embed .note,body.embed #list{display:none}
-body.embed .nav{margin-bottom:8px}
-body.embed .acts .ext{display:inline-block}
-body.embed #slot{display:grid;place-items:center;text-align:center;padding:0 24px;flex:1;min-height:0;margin:0 -16px;background:var(--panel);color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
+<div class="top">
+  <div class="head">
     <h1>Menu AI</h1>
-    <div class="acts"><button class="link ext" id="extbtn" aria-label="Buka di Chrome">Chrome</button><button class="link" id="editbtn" aria-pressed="false">Atur</button></div>
+    <button class="tool" id="reload" aria-label="Muat ulang">&#8635;</button>
+    <button class="tool" id="chrome" aria-label="Buka di Chrome">&#8599;</button>
+    <button class="atur" id="atur">Atur</button>
   </div>
-  <p class="sub" id="sub"></p>
-  <nav class="nav" id="nav" aria-label="Daftar AI"></nav>
-  <div id="slot">Memuat…</div>
-  <div id="list"></div>
+  <div class="chips" id="chips"></div>
+</div>
 
-  <details class="add" id="addbox">
-    <summary id="addtitle">+ Tambah AI</summary>
-    <div class="form">
-      <input id="n" placeholder="Nama, misalnya Mistral" aria-label="Nama AI" autocomplete="off">
-      <input id="u" placeholder="chat.mistral.ai" aria-label="Alamat situs" inputmode="url" autocapitalize="none" autocomplete="off">
-      <div class="colors" id="colors" role="group" aria-label="Warna"></div>
-      <p class="msg" id="msg"></p>
-      <button class="btn" id="addbtn">Tambah ke daftar</button>
-      <button class="btn alt" id="cancelbtn" style="display:none">Batal</button>
-    </div>
-  </details>
-  <button class="btn alt reset" id="resetbtn" style="display:none">Pulihkan AI bawaan yang terhapus</button>
-  <p class="note" id="note"></p>
+<div id="stage"><div class="hint" id="hint">Pilih AI di atas, jendelanya muncul di sini.</div></div>
+
+<div class="sheet hide" id="sheet">
+  <h2>Atur daftar AI</h2>
+  <div id="slist"></div>
+  <div class="form">
+    <b>Tambah AI</b>
+    <input id="n" placeholder="Nama, misalnya Mistral" aria-label="Nama AI">
+    <input id="u" placeholder="chat.mistral.ai" aria-label="Alamat situs" inputmode="url" autocapitalize="none">
+    <p class="msg" id="msg"></p>
+    <button class="btn" id="addbtn">Tambah ke daftar</button>
+  </div>
+  <button class="btn ghost" id="done" style="margin-top:14px">Selesai</button>
 </div>
 
 <script>
+// Skala koordinat jendela AI. Kalau posisinya meleset di HP, ubah jadi: var SCALE = window.devicePixelRatio;
+var SCALE = 1;
+
 var DEFAULTS=[
-{id:"d:chatgpt",n:"ChatGPT",u:"https://chatgpt.com",c:"#10a37f"},
-{id:"d:claude",n:"Claude",u:"https://claude.ai",c:"#c0603a"},
-{id:"d:gemini",n:"Gemini",u:"https://gemini.google.com",c:"#4a6cf7"},
-{id:"d:grok",n:"Grok",u:"https://grok.com",c:"#333b4a"},
-{id:"d:copilot",n:"Copilot",u:"https://copilot.microsoft.com",c:"#2b7bd6"},
-{id:"d:perplexity",n:"Perplexity",u:"https://www.perplexity.ai",c:"#1f8a9e"},
-{id:"d:deepseek",n:"DeepSeek",u:"https://chat.deepseek.com",c:"#4d6bfe"}
+{n:"ChatGPT",u:"https://chatgpt.com",c:"#10a37f"},
+{n:"Claude",u:"https://claude.ai",c:"#c0603a"},
+{n:"Gemini",u:"https://gemini.google.com",c:"#4a6cf7"},
+{n:"Grok",u:"https://grok.com",c:"#333b4a"},
+{n:"Copilot",u:"https://copilot.microsoft.com",c:"#2b7bd6"},
+{n:"Perplexity",u:"https://www.perplexity.ai",c:"#1f8a9e"},
+{n:"DeepSeek",u:"https://chat.deepseek.com",c:"#4d6bfe"}
 ];
-var COLORS=["#0e7c66","#4a6cf7","#c0603a","#b5338a","#d4891c","#333b4a"];
-var KEY="menuai.state",OLDKEY="menuai.custom";
-var state={items:seed()},editing=false,editId=null,color=COLORS[0];
-
+var KEY="menuai.custom",LAST="menuai.last",custom=[],active=null,views={},sheetOpen=false;
+try{custom=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){custom=[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(custom))}catch(e){}}
 function $(id){return document.getElementById(id)}
-function note(t){$("note").textContent=t||""}
-var CAP=window.Capacitor;
-var NATIVE=!!(CAP&&CAP.isNativePlatform&&CAP.isNativePlatform());
-function plug(name){return NATIVE&&CAP.Plugins&&CAP.Plugins[name]||null}
-function safe(p){if(p&&p.catch)p.catch(function(){})}
-function clone(a){return{id:a.id,n:a.n,u:a.u,c:a.c}}
-function seed(){return DEFAULTS.map(clone)}
+function all(){return DEFAULTS.concat(custom.map(function(x){x.custom=true;x.c=x.c||"#6b7a76";return x}))}
+function find(n){return all().filter(function(a){return a.n===n})[0]}
 
-/* ---------- penyimpanan: Preferences di app, localStorage di browser ---------- */
-function load(){
-  var P=plug("Preferences");
-  var getRaw=P?P.get({key:KEY}).then(function(r){return r&&r.value}).catch(function(){return null})
-              :Promise.resolve(localStorage.getItem(KEY));
-  return getRaw.then(function(raw){
-    if(raw){try{return fromSaved(JSON.parse(raw))}catch(e){}}
-    return migrateOld();
-  }).catch(function(){return migrateOld()});
-}
-function validItems(arr){
-  return(Array.isArray(arr)?arr:[]).filter(function(x){return x&&x.id&&x.n&&x.u})
-    .map(function(x){return{id:String(x.id),n:String(x.n),u:String(x.u),c:x.c||COLORS[0]}});
-}
-/* v2 punya "items"; v1 punya custom/hidden/order (AI bawaan terpisah) */
-function fromSaved(s){
-  if(s&&Array.isArray(s.items))return{items:validItems(s.items)};
-  var map={},items=[],seen={};
-  var all=DEFAULTS.map(clone).concat(validItems(s&&s.custom));
-  all.forEach(function(a){map[a.id]=a});
-  (Array.isArray(s&&s.order)?s.order:[]).forEach(function(id){if(map[id]&&!seen[id]){items.push(map[id]);seen[id]=1}});
-  all.forEach(function(a){if(!seen[a.id]){items.push(a);seen[a.id]=1}});
-  var hidden=Array.isArray(s&&s.hidden)?s.hidden:[];
-  return{items:items.filter(function(a){return hidden.indexOf(a.id)<0})};
-}
-function migrateOld(){
-  var items=seed();
-  try{
-    var old=JSON.parse(localStorage.getItem(OLDKEY)||"[]");
-    old.forEach(function(x,i){if(x&&x.n&&x.u)items.push({id:"c:m"+i,n:String(x.n),u:String(x.u),c:x.c||COLORS[0]})});
-  }catch(e){}
-  return{items:items};
-}
-function save(){
-  var raw=JSON.stringify({v:2,items:state.items}),P=plug("Preferences");
-  if(P){safe(P.set({key:KEY,value:raw}));return}
-  try{localStorage.setItem(KEY,raw)}catch(e){}
-}
+var C=window.Capacitor;
+var IB=C&&C.Plugins&&C.Plugins.InAppBrowser;
 
-/* ---------- daftar ---------- */
-function openAI(a){
-  note("");
-  var B=plug("Browser");
-  if(B){
-    try{
-      var r=B.open({url:a.u,toolbarColor:a.c||COLORS[0]});
-      if(r&&r.catch)r.catch(function(){note("Gagal membuka "+a.n+".")});
-      return;
-    }catch(e){}
-  }
-  var w=window.open(a.u,"_blank");
-  if(!w)note("Jendela diblokir. Izinkan popup untuk halaman ini.");
-}
-
-function move(id,dir){
-  var list=state.items,i=-1;
-  list.forEach(function(a,k){if(a.id===id)i=k});
-  var j=i+dir;
-  if(i<0||j<0||j>=list.length)return;
-  var t=list[i];list[i]=list[j];list[j]=t;
-  save();render();
-}
-function remove(a){
-  if(!confirm("Hapus "+a.n+" dari daftar?"))return;
-  dropView(a.id);
-  state.items=state.items.filter(function(c){return c.id!==a.id});
-  if(editId===a.id)resetForm();
-  save();render();
-}
-
-function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
-function host(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
-
-var sel=null;try{sel=localStorage.getItem("menuai.sel")}catch(e){}
-function current(){
-  var a=null;state.items.forEach(function(x){if(x.id===sel)a=x});
-  if(!a&&state.items.length){a=state.items[0];sel=a.id}
-  return a;
-}
-function toView(el){if(el&&el.scrollIntoView)el.scrollIntoView({inline:"center",block:"nearest"})}
-function paintNav(){
-  var nav=$("nav");nav.innerHTML="";
-  state.items.forEach(function(a){
-    var b=mk("button","chip"+(a.id===sel?" on":""),a.n);b.type="button";b.dataset.id=a.id;
-    b.style.setProperty("--c",a.c||COLORS[0]);
-    b.onclick=function(){pick(a.id)};
-    nav.appendChild(b);
-  });
-  toView(nav.querySelector(".on"));
-}
-function pick(id){
-  sel=id;note("");
-  var nav=$("nav");
-  [].forEach.call(nav.children,function(c){c.classList.toggle("on",c.dataset.id===id)});
-  toView(nav.querySelector(".on"));
-  paintStage();
-  active=id;
-  try{localStorage.setItem("menuai.sel",id)}catch(e){}
-  showEmbed(current());
-}
-function paintStage(){
-  var box=$("list");box.innerHTML="";box.className="stage";
-  var a=current();if(!a)return;
-  var card=mk("article","card pop");card.style.setProperty("--c",a.c||COLORS[0]);
-  var hero=mk("div","hero");
-  hero.appendChild(mk("span","big",a.n.charAt(0).toUpperCase()));
-  hero.appendChild(mk("div","bub l"));hero.appendChild(mk("div","bub r"));hero.appendChild(mk("div","typing"));
-  var body=mk("div","cbody");
-  body.appendChild(mk("h2",null,a.n));
-  body.appendChild(mk("span","badge",host(a.u)));
-  var go=mk("button","btn go","Buka");go.setAttribute("aria-label","Buka "+a.n);go.onclick=function(){openAI(a)};
-  body.appendChild(go);card.appendChild(hero);card.appendChild(body);box.appendChild(card);
-}
-
-/* ---------- chat tertanam: WebView native di bawah navbar ---------- */
-var IAB=plug("InAppBrowser"),EMBED=!!IAB,SCALE=1,views={},active=null,rt=null;
-function embedOn(){return EMBED&&!editing&&state.items.length>0}
 function rect(){
-  var r=$("slot").getBoundingClientRect();
-  return{x:Math.round(r.left*SCALE),y:Math.round(r.top*SCALE),width:Math.round(r.width*SCALE),height:Math.round(r.height*SCALE)};
+  var r=$("stage").getBoundingClientRect();
+  return {x:Math.round(r.left*SCALE),y:Math.round(r.top*SCALE),width:Math.round(r.width*SCALE),height:Math.round(r.height*SCALE)};
 }
-function real(id){return views[id]&&views[id]!=="pending"}
-function hideAll(except){Object.keys(views).forEach(function(id){if(id!==except&&real(id))safe(IAB.hide({id:views[id]}))})}
-function dropView(id){
-  if(real(id))safe(IAB.close({id:views[id]}));
-  delete views[id];
-}
-function showEmbed(a){
-  if(!embedOn()||!a)return;
-  hideAll(a.id);
-  var r=rect(),cur=views[a.id];
-  if(cur==="pending")return;
-  if(cur){safe(IAB.updateDimensions({id:cur,x:r.x,y:r.y,width:r.width,height:r.height}));safe(IAB.show({id:cur}));return}
-  views[a.id]="pending";
-  $("slot").textContent="Memuat "+a.n+"…";
-  IAB.openWebView({url:a.u,toolbarType:"blank",openBlankTargetInWebView:true,activeNativeNavigationForWebview:true,persistWebViewData:true,
-    x:r.x,y:r.y,width:r.width,height:r.height})
-  .then(function(res){
-    if(views[a.id]!=="pending"){safe(IAB.close({id:res.id}));return}
-    views[a.id]=res.id;
-    if(!embedOn()||active!==a.id)safe(IAB.hide({id:res.id}));
-  }).catch(function(){
-    delete views[a.id];
-    $("slot").textContent="Chat tidak bisa ditampilkan di dalam app. Ketuk tombol Chrome di atas untuk membukanya di browser.";
+function safe(p){try{var r=p;if(r&&r.catch)r.catch(function(){})}catch(e){}}
+
+function renderChips(){
+  var box=$("chips");box.innerHTML="";
+  all().forEach(function(a){
+    var b=document.createElement("button");
+    b.className="chip"+(active&&active.n===a.n?" on":"");
+    b.textContent=a.n;
+    if(active&&active.n===a.n)b.style.backgroundColor=a.c;
+    b.onclick=function(){select(a)};
+    box.appendChild(b);
+    if(active&&active.n===a.n){setTimeout(function(){try{b.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}},0)}
   });
 }
-window.addEventListener("resize",function(){
-  clearTimeout(rt);
-  rt=setTimeout(function(){
-    if(!embedOn()||!real(active))return;
-    var r=rect();safe(IAB.updateDimensions({id:views[active],x:r.x,y:r.y,width:r.width,height:r.height}));
-  },150);
-});
 
-function render(){
-  var box=$("list");box.innerHTML="";
-  $("sub").textContent=editing
-    ?"Mode atur: ubah urutan, edit, atau hapus AI mana pun."
-    :"Pilih AI di atas, lalu ketuk Buka. Tombol kembali membawamu pulang ke sini.";
-  $("editbtn").textContent=editing?"Selesai":"Atur";
-  $("editbtn").setAttribute("aria-pressed",editing);
-  $("resetbtn").style.display=editing?"block":"none";
-  var shown=state.items;
-  document.body.classList.toggle("embed",embedOn());
-  if(EMBED&&!embedOn())hideAll(null);
-  $("nav").style.display=(editing||!shown.length)?"none":"flex";
-  if(!shown.length){
-    box.className="edit";
-    box.appendChild(mk("p","empty","Daftar kosong. Tambah AI di bawah, atau tekan Atur lalu Pulihkan AI bawaan."));
+function hideAll(except){
+  if(!IB)return;
+  Object.keys(views).forEach(function(n){if(n!==except)safe(IB.hide({id:views[n]}))});
+}
+
+function select(a){
+  active=a;
+  try{localStorage.setItem(LAST,a.n)}catch(e){}
+  renderChips();
+  if(!IB){
+    $("hint").classList.remove("hide");
+    $("hint").textContent="Pratinjau ini hanya jalan di aplikasi Android. Membuka "+a.n+" di tab baru.";
+    window.open(a.u,"_blank");
     return;
   }
-  if(!editing){
-    current();paintNav();paintStage();active=sel;
-    if(embedOn())requestAnimationFrame(function(){showEmbed(current())});
-    return;
-  }
+  $("hint").classList.add("hide");
+  hideAll(a.n);
+  if(views[a.n]){safe(IB.show({id:views[a.n]}));return}
+  var d=rect();
+  IB.openWebView({
+    url:a.u,x:d.x,y:d.y,width:d.width,height:d.height,
+    toolbarType:"blank",enabledSafeTopMargin:false,enabledSafeBottomMargin:false,title:a.n
+  }).then(function(r){
+    views[a.n]=r.id;
+    if(!active||active.n!==a.n||sheetOpen)safe(IB.hide({id:r.id}));
+  }).catch(function(e){
+    $("hint").classList.remove("hide");
+    $("hint").textContent="Gagal membuka "+a.n+": "+(e&&e.message?e.message:e);
+  });
+}
 
-  box.className="edit";
-  shown.forEach(function(a,idx){
-    var row=mk("div","row");row.style.setProperty("--c",a.c||COLORS[0]);
-    var main=mk("div","main");
-    var b=mk("button","item");
-    var d=mk("span","dot",a.n.charAt(0).toUpperCase());d.style.background=a.c||COLORS[0];
-    var t=mk("span","txt");
-    t.appendChild(mk("span","name",a.n));
-    t.appendChild(mk("small",null,host(a.u)));
-    b.appendChild(d);b.appendChild(t);
-    main.appendChild(b);row.appendChild(main);
-    var tools=mk("div","tools");
-    var up=mk("button","sq","▲");up.setAttribute("aria-label","Naikkan "+a.n);up.disabled=idx===0;up.onclick=function(){move(a.id,-1)};
-    var dn=mk("button","sq","▼");dn.setAttribute("aria-label","Turunkan "+a.n);dn.disabled=idx===shown.length-1;dn.onclick=function(){move(a.id,1)};
-    var ed=mk("button",null,"Edit");ed.onclick=function(){startEdit(a)};
-    var del=mk("button","danger","Hapus");del.setAttribute("aria-label","Hapus "+a.n);del.onclick=function(){remove(a)};
-    tools.appendChild(up);tools.appendChild(dn);tools.appendChild(ed);tools.appendChild(del);
-    row.appendChild(tools);
+$("reload").onclick=function(){
+  if(IB&&active&&views[active.n])safe(IB.reload({id:views[active.n]}));
+};
+$("chrome").onclick=function(){
+  if(!active)return;
+  if(IB)safe(IB.open({url:active.u}));else window.open(active.u,"_blank");
+};
+
+// ---- Atur ----
+function renderSheet(){
+  var box=$("slist");box.innerHTML="";
+  all().forEach(function(a){
+    var row=document.createElement("div");row.className="srow";
+    var it=document.createElement("div");it.className="sitem";
+    var d=document.createElement("span");d.className="sdot";d.style.background=a.c;d.textContent=a.n.charAt(0).toUpperCase();
+    var t=document.createElement("div");t.style.minWidth="0";
+    var nm=document.createElement("div");nm.className="sname";nm.textContent=a.n;
+    var ur=document.createElement("div");ur.className="surl";ur.textContent=a.u.replace(/^https?:\/\//,"");
+    t.appendChild(nm);t.appendChild(ur);it.appendChild(d);it.appendChild(t);row.appendChild(it);
+    if(a.custom){
+      var x=document.createElement("button");x.className="del";x.textContent="Hapus";
+      x.onclick=function(){
+        custom=custom.filter(function(c){return c.n!==a.n});save();
+        if(IB&&views[a.n]){safe(IB.close({id:views[a.n]}));delete views[a.n]}
+        if(active&&active.n===a.n)active=null;
+        renderSheet();renderChips();
+      };
+      row.appendChild(x);
+    }
     box.appendChild(row);
   });
 }
-
-/* ---------- form tambah / edit ---------- */
-function drawColors(){
-  var c=$("colors");c.innerHTML="";
-  COLORS.forEach(function(hex){
-    var b=mk("button");b.type="button";b.style.background=hex;
-    b.setAttribute("aria-label","Warna "+hex);b.setAttribute("aria-pressed",hex===color);
-    b.onclick=function(){color=hex;drawColors()};
-    c.appendChild(b);
-  });
+function openSheet(){
+  sheetOpen=true;hideAll();renderSheet();$("sheet").classList.remove("hide");
 }
-function resetForm(){
-  editId=null;color=COLORS[0];
-  $("n").value="";$("u").value="";$("msg").textContent="";
-  $("addtitle").textContent="+ Tambah AI";$("addbtn").textContent="Tambah ke daftar";
-  $("cancelbtn").style.display="none";
-  drawColors();
+function closeSheet(){
+  sheetOpen=false;$("sheet").classList.add("hide");
+  if(IB&&active&&views[active.n])safe(IB.show({id:views[active.n]}));
+  else if(!active)$("hint").classList.remove("hide");
 }
-function startEdit(a){
-  editId=a.id;color=a.c||COLORS[0];
-  $("n").value=a.n;$("u").value=a.u;$("msg").textContent="";
-  $("addtitle").textContent="Edit "+a.n;$("addbtn").textContent="Simpan perubahan";
-  $("cancelbtn").style.display="block";
-  $("addbox").open=true;drawColors();
-  $("addbox").scrollIntoView({behavior:"smooth",block:"center"});
-}
-function norm(u){return u.toLowerCase().replace(/^https?:\/\/(www\.)?/,"").replace(/\/+$/,"")}
+$("atur").onclick=openSheet;
+$("done").onclick=closeSheet;
 
 $("addbtn").onclick=function(){
   var n=$("n").value.trim(),u=$("u").value.trim(),m=$("msg");
   if(!n){m.textContent="Isi nama AI dulu.";return}
   if(!u){m.textContent="Isi alamat situsnya.";return}
+  if(find(n)){m.textContent="Nama itu sudah ada.";return}
   if(!/^https?:\/\//i.test(u))u="https://"+u;
-  var parsed;
-  try{parsed=new URL(u)}catch(e){m.textContent="Alamat situs tidak valid.";return}
-  if(parsed.hostname.indexOf(".")<1){m.textContent="Alamat situs tidak valid.";return}
-  var dup=state.items.some(function(a){
-    return a.id!==editId&&(a.n.toLowerCase()===n.toLowerCase()||norm(a.u)===norm(u));
-  });
-  if(dup){m.textContent="Nama atau alamat itu sudah ada di daftar.";return}
-  if(editId){
-    state.items.forEach(function(x){if(x.id===editId&&x.u!==u)dropView(editId)});
-    state.items=state.items.map(function(x){return x.id===editId?{id:x.id,n:n,u:u,c:color}:x});
-  }else{
-    state.items.push({id:"c:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:n,u:u,c:color});
-  }
-  save();resetForm();render();
+  try{new URL(u)}catch(e){m.textContent="Alamat situs tidak valid.";return}
+  custom.push({n:n,u:u});save();renderSheet();renderChips();
+  $("n").value="";$("u").value="";m.textContent="";
 };
-$("cancelbtn").onclick=resetForm;
-$("extbtn").onclick=function(){var a=current();if(a)openAI(a)};
 ["n","u"].forEach(function(id){$(id).oninput=function(){$("msg").textContent=""}});
 
-$("editbtn").onclick=function(){editing=!editing;note("");if(!editing)resetForm();render()};
-$("resetbtn").onclick=function(){
-  var have={};state.items.forEach(function(a){have[a.id]=1});
-  var missing=DEFAULTS.filter(function(a){return !have[a.id]});
-  if(!missing.length){note("Semua AI bawaan masih ada di daftar.");return}
-  if(!confirm("Tambahkan kembali "+missing.length+" AI bawaan yang terhapus?"))return;
-  missing.forEach(function(a){state.items.push(clone(a))});
-  note("");save();render();
-};
-
-/* ---------- status bar mengikuti tema ---------- */
-function bar(){
-  var S=plug("StatusBar");if(!S)return;
-  var dark=window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches;
-  try{safe(S.setStyle({style:dark?"DARK":"LIGHT"}))}catch(e){}
+// Ikuti perubahan ukuran area (putar layar, dll.)
+function relayout(){
+  if(!IB)return;
+  var d=rect();
+  Object.keys(views).forEach(function(n){
+    safe(IB.updateDimensions({id:views[n],x:d.x,y:d.y,width:d.width,height:d.height}));
+  });
 }
-if(window.matchMedia){
-  var mq=matchMedia("(prefers-color-scheme:dark)");
-  if(mq.addEventListener)mq.addEventListener("change",bar);
-}
+if(window.ResizeObserver){new ResizeObserver(relayout).observe($("stage"))}
+window.addEventListener("resize",relayout);
 
-drawColors();
-bar();
-load().then(function(s){state=s;render()});
+renderChips();
+try{var last=localStorage.getItem(LAST);var f=last&&find(last);if(f)setTimeout(function(){select(f)},300)}catch(e){}
 </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 name: Inspect InAppBrowser plugin
 
-# Hanya membaca dan mencetak isi plugin ke log. Tidak membangun APK dan tidak mengubah apa pun.
+# Hanya membaca dan mencetak potongan kode plugin ke log. Tidak membangun APK dan tidak mengubah apa pun.
 on:
   workflow_dispatch:
 
@@ -17,20 +17,17 @@ jobs:
       - name: Pasang dependensi
         run: npm install
 
-      - name: Versi dan daftar file plugin
+      - name: Potongan kode plugin
         run: |
-          D=node_modules/@capgo/inappbrowser
-          echo "Versi plugin:"
-          node -p "require('./$D/package.json').version"
+          D=node_modules/@capgo/inappbrowser/android/src/main/java/ee/forgr/capacitor_inappbrowser
+          echo "=== A. WebViewDialog: tempat _webView dibuat ==="
+          grep -nE "_webView\s*=|findViewById|setContentView|R\.layout|instanceId" "$D/WebViewDialog.java" | head -60
           echo
-          echo "File Android:"
-          find "$D/android" \( -name "*.java" -o -name "*.kt" -o -name "build.gradle" \) -print0 | xargs -0 wc -l
-
-      - name: build.gradle milik plugin
-        run: cat node_modules/@capgo/inappbrowser/android/build.gradle
-
-      - name: Bagian penting (pembuatan WebView, id jendela, cookie)
-        run: |
-          D=node_modules/@capgo/inappbrowser/android
-          grep -rnE "new WebView\(|extends WebView|class .*WebView|\.loadUrl\(|setProfile|androidx\.webkit|CookieManager|getString\(\"id\"\)|\"id\"" \
-            "$D" --include=*.java --include=*.kt | head -200
+          echo "=== B. WebViewDialog baris 395-430 ==="
+          sed -n '395,430p' "$D/WebViewDialog.java"
+          echo
+          echo "=== C. Options: title dan id ==="
+          grep -nE "[Tt]itle|\bid\b|[Ii]d\(" "$D/Options.java" | head -40
+          echo
+          echo "=== D. InAppBrowserPlugin baris 380-470 ==="
+          sed -n '380,470p' "$D/InAppBrowserPlugin.java"

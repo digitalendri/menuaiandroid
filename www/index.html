@@ -40,6 +40,12 @@ h1{font-size:26px;white-space:nowrap;line-height:1.1;font-weight:800;letter-spac
 .grip{flex:none;width:40px;border:1px solid var(--line);background:var(--panel);border-radius:14px;color:var(--mute);display:grid;place-items:center;font-size:22px;line-height:1;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 .srow.drag .sitem,.srow.drag .grip{border-color:var(--acc);box-shadow:0 6px 16px rgba(0,0,0,.25)}
 .srow.drag{opacity:.92}
+.pop{position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.4)}
+.popcard{position:absolute;left:14px;right:14px;max-height:60%;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.poptitle{font-size:12px;color:var(--mute);padding:6px 10px}
+.popitem{display:flex;align-items:center;gap:12px;width:100%;padding:10px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:inherit;font-weight:600;text-align:left}
+.popitem.on,.popitem:active{background:var(--bg)}
+.popitem .ck{margin-left:auto;color:var(--acc);font-size:18px}
 .act{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:0 12px;font:inherit;font-size:14px;font-weight:600}
 .act.edit{color:var(--acc)}
 .act.del{color:var(--danger)}
@@ -108,6 +114,8 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
   <button class="btn warn" id="reset" style="margin-top:14px">Kembalikan daftar bawaan</button>
   <button class="btn ghost" id="done" style="margin-top:8px">Selesai</button>
 </div>
+
+<div class="pop hide" id="pop"><div class="popcard" id="popcard"><div class="poptitle">Pilih akun</div><div id="poplist"></div></div></div>
 
 <div class="sheet hide" id="psheet">
   <h2>Kumpulan prompt</h2>
@@ -182,19 +190,51 @@ function showHint(t){
   h.classList.remove("hide");
 }
 
+function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
+// Item dengan situs yang sama (mis. Dola, Dola 1, Dola 2) digabung jadi satu tombol dengan pilihan akun.
+function groupsOf(){
+  var order=[],map={};
+  list.forEach(function(a){
+    var h=hostOf(a.u);
+    if(!map[h]){map[h]=[];order.push(h)}
+    map[h].push(a);
+  });
+  return order.map(function(h){return map[h]});
+}
+
 function renderChips(){
   var box=$("chips");box.innerHTML="";
-  list.forEach(function(a){
-    var on=active&&active.id===a.id;
+  groupsOf().forEach(function(g){
+    var act=active&&g.filter(function(a){return a.id===active.id})[0];
+    var multi=g.length>1,shown=act||g[0];
     var b=document.createElement("button");
-    b.className="chip"+(on?" on":"");
-    b.textContent=a.n;
-    if(on)b.style.backgroundColor=a.c;
-    b.onclick=function(){select(a)};
+    b.className="chip"+(act?" on":"");
+    b.textContent=shown.n+(multi?" \u25BE":"");
+    if(act)b.style.backgroundColor=shown.c;
+    b.onclick=multi?function(){openPop(g)}:function(){select(g[0])};
     box.appendChild(b);
-    if(on){setTimeout(function(){try{b.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}},0)}
+    if(act){setTimeout(function(){try{b.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}},0)}
   });
 }
+
+function openPop(g){
+  sheetOpen=true;hideAll();
+  var box=$("poplist");box.innerHTML="";
+  g.forEach(function(a){
+    var on=active&&active.id===a.id;
+    var r=document.createElement("button");r.className="popitem"+(on?" on":"");
+    var d=document.createElement("span");d.className="sdot";d.style.background=a.c;d.textContent=a.n.charAt(0).toUpperCase();
+    var t=document.createElement("span");t.textContent=a.n;
+    r.appendChild(d);r.appendChild(t);
+    if(on){var c=document.createElement("span");c.className="ck";c.textContent="\u2713";r.appendChild(c)}
+    r.onclick=function(){$("pop").classList.add("hide");sheetOpen=false;select(a)};
+    box.appendChild(r);
+  });
+  $("popcard").style.top=(document.querySelector(".top").getBoundingClientRect().bottom+6)+"px";
+  $("pop").classList.remove("hide");
+}
+function closePop(){$("pop").classList.add("hide");resume()}
+$("pop").onclick=function(e){if(e.target===$("pop"))closePop()};
 
 function hideAll(except){
   if(!IB)return;

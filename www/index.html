@@ -233,7 +233,7 @@ function renderChips(){
 }
 
 function openPop(g){
-  sheetOpen=true;hideAll();
+  sheetOpen=true;hideAll();startGuard();
   var box=$("poplist");box.innerHTML="";
   g.forEach(function(a){
     var on=active&&active.id===a.id;
@@ -251,10 +251,26 @@ function openPop(g){
 function closePop(){$("pop").classList.add("hide");resume()}
 $("pop").onclick=function(e){if(e.target===$("pop"))closePop()};
 
+// Jendela disembunyikan dan juga digeser ke luar layar, supaya kalau ada yang memunculkannya lagi
+// (mis. setelah pemilih galeri tertutup) ia tetap tidak menutupi layar Atur.
 function hideAll(except){
   if(!IB)return;
-  Object.keys(views).forEach(function(id){if(id!==except)safe(IB.hide({id:views[id]}))});
+  var d=rect(),off=Math.round(window.innerHeight*SCALE)+60;
+  Object.keys(views).forEach(function(id){
+    if(id===except)return;
+    safe(IB.hide({id:views[id]}));
+    safe(IB.updateDimensions({id:views[id],x:d.x,y:off,width:d.width,height:d.height}));
+  });
 }
+function showView(id){
+  var d=rect();
+  safe(IB.updateDimensions({id:id,x:d.x,y:d.y,width:d.width,height:d.height}));
+  safe(IB.show({id:id}));
+}
+// Selama lembar Atur/Prompt/pilihan akun terbuka, ulangi menyembunyikan tiap sebentar.
+var guardTimer=null;
+function stopGuard(){clearInterval(guardTimer);guardTimer=null}
+function startGuard(){stopGuard();guardTimer=setInterval(function(){if(sheetOpen)hideAll();else stopGuard()},400)}
 function closeView(id){
   if(IB&&views[id])safe(IB.close({id:views[id]}));
   delete views[id];
@@ -271,7 +287,7 @@ function select(a){
   }
   $("hint").classList.add("hide");
   hideAll(a.id);
-  if(views[a.id]){safe(IB.show({id:views[a.id]}));return}
+  if(views[a.id]){showView(views[a.id]);return}
   if(opening[a.id])return;
   opening[a.id]=true;
   var d=rect(),url=a.u;
@@ -412,7 +428,7 @@ function remove(a){
 }
 
 function openSheet(){
-  sheetOpen=true;hideAll();renderSheet();$("sheet").classList.remove("hide");
+  sheetOpen=true;hideAll();startGuard();renderSheet();$("sheet").classList.remove("hide");
 }
 function closeSheet(){
   cancelEdit();$("sheet").classList.add("hide");
@@ -423,7 +439,7 @@ function resume(){
   sheetOpen=false;
   if(active&&!byId(active.id))active=null;
   if(!active){renderChips();showHint();return}
-  if(IB&&views[active.id])safe(IB.show({id:views[active.id]}));
+  if(IB&&views[active.id])showView(views[active.id]);
   else select(active); // misalnya alamatnya baru diubah
 }
 $("atur").onclick=openSheet;
@@ -541,7 +557,7 @@ function pRemove(p){
   renderPrompts();
 }
 function openPrompts(){
-  sheetOpen=true;hideAll();renderPrompts();$("psheet").classList.remove("hide");
+  sheetOpen=true;hideAll();startGuard();renderPrompts();$("psheet").classList.remove("hide");
 }
 function closePrompts(){
   pCancel();$("psheet").classList.add("hide");resume();

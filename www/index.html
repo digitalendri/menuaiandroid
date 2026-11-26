@@ -71,6 +71,10 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
 .seg button{flex:1;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-weight:600}
 .seg button.on{background:var(--acc);color:var(--bg);border-color:transparent}
 .note{margin:0;font-size:12px;color:var(--mute)}
+h1{min-width:0;overflow:hidden;text-overflow:ellipsis}
+body.bgimg{background-size:cover;background-position:center;background-attachment:fixed}
+body.bgimg #stage{background:transparent;border-top-color:transparent}
+body.bgimg h1,body.bgimg .hint{color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.65)}
 </style>
 </head>
 <body>
@@ -101,6 +105,15 @@ input[type=color]{width:64px;min-height:44px;height:44px;padding:4px;flex:none}
       <button class="btn ghost hide" id="cancel">Batal</button>
       <button class="btn" id="addbtn">Tambah ke daftar</button>
     </div>
+  </div>
+  <div class="form">
+    <b>Tampilan</b>
+    <input id="lt" maxlength="16" placeholder="Judul aplikasi (kosongkan untuk Menu AI)" aria-label="Judul aplikasi">
+    <div class="crow"><input type="color" id="lb" value="#eceff7" aria-label="Warna latar"><span>Warna latar</span><button class="act" id="lbx" type="button" style="margin-left:auto;height:44px">Bawaan</button></div>
+    <div class="crow"><input type="color" id="la" value="#0e7c66" aria-label="Warna aksen"><span>Warna aksen</span><button class="act" id="lax" type="button" style="margin-left:auto;height:44px">Bawaan</button></div>
+    <div class="crow"><button class="act" id="lim" type="button" style="height:44px">Pilih gambar latar</button><button class="act" id="limx" type="button" style="height:44px;margin-left:auto">Hapus</button></div>
+    <input type="file" id="lif" accept="image/*" class="hide">
+    <p class="note">Warna latar pilihanmu menggantikan tema terang/gelap otomatis. Tekan Bawaan untuk mengembalikannya.</p>
   </div>
   <div class="form">
     <b>Tema menu aplikasi</b>
@@ -547,6 +560,60 @@ $("psave").onclick=function(){
   savePrompts();pCancel();renderPrompts();
 };
 ["pt","px"].forEach(function(id){$(id).oninput=function(){$("pmsg").textContent=""}});
+
+// ---- Tampilan: judul, warna latar, warna aksen ----
+var LOOK="menuai.look",look={};
+try{look=JSON.parse(localStorage.getItem(LOOK)||"{}")||{}}catch(e){look={}}
+var HEX=/^#[0-9a-f]{6}$/i;
+function lum(h){return (0.299*parseInt(h.slice(1,3),16)+0.587*parseInt(h.slice(3,5),16)+0.114*parseInt(h.slice(5,7),16))/255}
+function mixc(h,t,k){var o="#";for(var i=1;i<7;i+=2){var v=parseInt(h.slice(i,i+2),16);v=Math.round(v+(t-v)*k);o+=("0"+v.toString(16)).slice(-2)}return o}
+function applyLook(){
+  var r=document.documentElement.style;
+  ["--bg","--panel","--ink","--mute","--line","--acc"].forEach(function(n){r.removeProperty(n)});
+  if(HEX.test(look.bg||"")){
+    var dark=lum(look.bg)<.5;
+    r.setProperty("--bg",look.bg);
+    r.setProperty("--panel",dark?mixc(look.bg,255,.1):mixc(look.bg,255,.75));
+    r.setProperty("--ink",dark?"#eef1f8":"#12161f");
+    r.setProperty("--mute",dark?"#9aa4ba":"#5d6678");
+    r.setProperty("--line",dark?mixc(look.bg,255,.2):mixc(look.bg,0,.12));
+  }
+  if(HEX.test(look.acc||""))r.setProperty("--acc",look.acc);
+  var t=(look.title||"").trim()||"Menu AI";
+  document.querySelector("h1").textContent=t;document.title=t;
+  var bd=document.body;
+  if(look.img){bd.classList.add("bgimg");bd.style.backgroundImage='linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.25)),url("'+look.img+'")'}
+  else{bd.classList.remove("bgimg");bd.style.backgroundImage=""}
+}
+function saveLook(){try{localStorage.setItem(LOOK,JSON.stringify(look))}catch(e){}applyLook()}
+$("lt").value=look.title||"";$("lb").value=HEX.test(look.bg||"")?look.bg:"#eceff7";$("la").value=HEX.test(look.acc||"")?look.acc:"#0e7c66";
+$("lt").oninput=function(){look.title=this.value;saveLook()};
+$("lb").oninput=function(){look.bg=this.value;saveLook()};
+$("la").oninput=function(){look.acc=this.value;saveLook()};
+$("lbx").onclick=function(){delete look.bg;$("lb").value="#eceff7";saveLook()};
+$("lax").onclick=function(){delete look.acc;$("la").value="#0e7c66";saveLook()};
+$("lim").onclick=function(){$("lif").click()};
+$("lif").onchange=function(){
+  var f=this.files&&this.files[0];
+  if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var im=new Image();
+    im.onload=function(){
+      var k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement("canvas");
+      c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+      c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+      var old=look.img;look.img=c.toDataURL("image/jpeg",.78);
+      try{localStorage.setItem(LOOK,JSON.stringify(look))}catch(e){look.img=old;toast("Gambar terlalu besar untuk disimpan.");return}
+      applyLook();
+    };
+    im.onerror=function(){toast("File itu tidak bisa dibaca sebagai gambar.")};
+    im.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+};
+$("limx").onclick=function(){delete look.img;saveLook()};
+applyLook();
 
 // ---- Tema menu aplikasi ----
 var THEME_KEY="menuai.theme";

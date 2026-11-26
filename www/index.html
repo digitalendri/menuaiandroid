@@ -594,8 +594,15 @@ $("lb").oninput=function(){look.bg=this.value;saveLook()};
 $("la").oninput=function(){look.acc=this.value;saveLook()};
 $("lbx").onclick=function(){delete look.bg;$("lb").value="#eceff7";saveLook()};
 $("lax").onclick=function(){delete look.acc;$("la").value="#0e7c66";saveLook()};
-$("lim").onclick=function(){$("lif").click()};
+// Setelah pemilih file (galeri) ditutup, jendela AI bisa muncul lagi di atas layar Atur.
+// Selama lembar Atur/Prompt terbuka, sembunyikan ulang beberapa kali.
+function keepHidden(){if(sheetOpen)hideAll()}
+function keepHiddenSoon(){[100,400,1000,2200].forEach(function(t){setTimeout(keepHidden,t)})}
+document.addEventListener("visibilitychange",keepHiddenSoon);
+window.addEventListener("focus",keepHiddenSoon);
+$("lim").onclick=function(){keepHiddenSoon();$("lif").click()};
 $("lif").onchange=function(){
+  keepHiddenSoon();
   var f=this.files&&this.files[0];
   if(!f)return;
   var rd=new FileReader();

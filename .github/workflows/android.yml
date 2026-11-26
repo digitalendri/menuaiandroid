@@ -6,12 +6,33 @@ on:
     paths-ignore:
       - "**.md"
   workflow_dispatch:
+    inputs:
+      versi:
+        description: "Nomor versi rilis, mis. 1.1.0. Kosongkan kalau hanya ingin build tanpa rilis."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Tentukan nomor versi
+        env:
+          INPUT_V: ${{ inputs.versi }}
+        run: |
+          if [ -n "$INPUT_V" ]; then
+            echo "$INPUT_V" | grep -Eq '^[0-9]+(\.[0-9]+){1,3}$' || { echo "::error::Format versi harus angka dipisah titik, mis. 1.1.0"; exit 1; }
+            V="$INPUT_V"
+          else
+            V="dev-${{ github.run_number }}"
+          fi
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Versi build: $V"
 
       - uses: actions/setup-node@v4
         with:
@@ -66,6 +87,23 @@ jobs:
           npx capacitor-assets generate --android || echo "Lewati ikon: assets tidak lengkap"
           npx cap sync android
 
+      - name: Tulis nomor versi ke aplikasi dan Android
+        env:
+          INPUT_V: ${{ inputs.versi }}
+        run: |
+          N=${{ github.run_number }}
+          sed -i -E "s/versionCode [0-9]+/versionCode $N/; s/versionName \"[^\"]*\"/versionName \"$APP_VERSION\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+          grep -q "versionCode $N" android/app/build.gradle || { echo "::error::versionCode tidak bisa diatur di build.gradle."; exit 1; }
+          F=android/app/src/main/assets/public/index.html
+          if grep -q "__APP_VERSION__" "$F"; then
+            sed -i "s/__APP_VERSION__/$APP_VERSION/" "$F"
+          elif [ -n "$INPUT_V" ]; then
+            echo "::error::Penanda versi tidak ada di index.html. Pakai index.html terbaru sebelum merilis."; exit 1
+          else
+            echo "::warning::Penanda versi tidak ada di index.html, nomor versi tidak ditulis ke aplikasi."
+          fi
+
       - name: Izin mikrofon dan kamera (untuk input suara di situs AI)
         run: |
           F=android/app/src/main/AndroidManifest.xml
@@ -119,3 +157,12 @@ jobs:
           name: MenuAI-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      - name: Terbitkan rilis di GitHub Releases
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.versi != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.versi }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk "MenuAI-$V.apk"
+          gh release create "v$V" "MenuAI-$V.apk" --title "Menu AI v$V" --notes "Menu AI v$V" --target "$GITHUB_SHA"

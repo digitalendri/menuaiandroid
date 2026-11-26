@@ -75,6 +75,7 @@ h1{min-width:0;overflow:hidden;text-overflow:ellipsis}
 body.bgimg{background-size:cover;background-position:center;background-attachment:fixed}
 body.bgimg #stage{background:transparent;border-top-color:transparent}
 body.bgimg h1,body.bgimg .hint{color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.65)}
+.act{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -113,6 +114,7 @@ body.bgimg h1,body.bgimg .hint{color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.65)}
     <div class="crow"><input type="color" id="la" value="#0e7c66" aria-label="Warna aksen"><span>Warna aksen</span><button class="act" id="lax" type="button" style="margin-left:auto;height:44px">Bawaan</button></div>
     <div class="crow"><button class="act" id="lim" type="button" style="height:44px">Pilih gambar latar</button><button class="act" id="limx" type="button" style="height:44px;margin-left:auto">Hapus</button></div>
     <input type="file" id="lif" accept="image/*" class="hide">
+    <button class="btn warn" id="lreset" type="button">Kembalikan tampilan bawaan</button>
     <p class="note">Warna latar pilihanmu menggantikan tema terang/gelap otomatis. Tekan Bawaan untuk mengembalikannya.</p>
   </div>
   <div class="form">
@@ -613,6 +615,7 @@ $("lif").onchange=function(){
   rd.readAsDataURL(f);
 };
 $("limx").onclick=function(){delete look.img;saveLook()};
+$("lreset").onclick=function(){look={};$("lt").value="";$("lb").value="#eceff7";$("la").value="#0e7c66";saveLook();toast("Tampilan dikembalikan ke bawaan.")};
 applyLook();
 
 // ---- Tema menu aplikasi ----

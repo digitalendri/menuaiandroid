@@ -121,6 +121,12 @@ h1{min-width:0;overflow:hidden;text-overflow:ellipsis}
     </div>
     <p class="note">Mengatur tampilan menu di atas. Tema tiap situs AI diatur di pengaturan situsnya sendiri.</p>
   </div>
+  <div class="form">
+    <b>Pembaruan</b>
+    <p class="note" id="vinfo"></p>
+    <p class="note" id="updmsg"></p>
+    <div class="btns"><button class="btn ghost" id="updchk" type="button">Cek pembaruan</button><button class="btn hide" id="updgo" type="button">Unduh</button></div>
+  </div>
   <button class="btn warn" id="reset" style="margin-top:14px">Kembalikan daftar bawaan</button>
   <button class="btn ghost" id="done" style="margin-top:8px">Selesai</button>
 </div>
@@ -589,6 +595,51 @@ $("lbx").onclick=function(){delete look.bg;$("lb").value="#eceff7";saveLook()};
 $("lax").onclick=function(){delete look.acc;$("la").value="#0e7c66";saveLook()};
 $("lreset").onclick=function(){look={};$("lt").value="";$("lb").value="#eceff7";$("la").value="#0e7c66";saveLook();toast("Tampilan dikembalikan ke bawaan.")};
 applyLook();
+
+// ---- Pembaruan lewat GitHub Releases ----
+var APP_VERSION="__APP_VERSION__";
+var REPO_API="https://api.github.com/repos/digitalendri/menuaiandroid/releases/latest";
+var REPO_PAGE="https://github.com/digitalendri/menuaiandroid/releases/latest",updUrl=null;
+var devBuild=!/^\d/.test(APP_VERSION);
+$("vinfo").textContent="Versi terpasang: "+(devBuild?"pengembangan":"v"+APP_VERSION);
+function vnum(v){return String(v).replace(/^v/i,"").split(".").map(function(x){return parseInt(x,10)||0})}
+function isNewer(a,b){
+  var x=vnum(a),y=vnum(b);
+  for(var i=0;i<Math.max(x.length,y.length);i++){var d=(x[i]||0)-(y[i]||0);if(d)return d>0}
+  return false;
+}
+function checkUpdate(manual){
+  var out=$("updmsg"),go=$("updgo");
+  if(manual){out.textContent="Memeriksa…";go.classList.add("hide")}
+  return fetch(REPO_API,{headers:{Accept:"application/vnd.github+json"}}).then(function(r){
+    if(r.status===404)return null;
+    if(!r.ok)throw new Error("http "+r.status);
+    return r.json();
+  }).then(function(j){
+    if(!j){if(manual)out.textContent="Belum ada rilis di GitHub.";return}
+    var tag=String(j.tag_name||""),apk=(j.assets||[]).filter(function(a){return /\.apk$/i.test(a.name||"")})[0];
+    if(devBuild||isNewer(tag,APP_VERSION)){
+      updUrl=apk?apk.browser_download_url:(j.html_url||REPO_PAGE);
+      if(manual){
+        out.textContent=(devBuild?"Rilis terbaru: ":"Versi baru tersedia: ")+tag;
+        go.textContent="Unduh "+tag;go.classList.remove("hide");
+      }else{
+        var seen="";try{seen=localStorage.getItem("menuai.updnote")||""}catch(e){}
+        if(seen!==tag){
+          try{localStorage.setItem("menuai.updnote",tag)}catch(e){}
+          toast("Versi "+tag+" tersedia. Buka Atur, lalu Pembaruan.",5000);
+        }
+      }
+    }else if(manual){
+      out.textContent="Kamu sudah memakai versi terbaru.";
+    }
+  }).catch(function(){
+    if(manual)out.textContent="Tidak bisa memeriksa pembaruan. Periksa koneksi internet.";
+  });
+}
+$("updchk").onclick=function(){checkUpdate(true)};
+$("updgo").onclick=function(){window.open(updUrl||REPO_PAGE,"_blank")};
+if(!devBuild)setTimeout(function(){checkUpdate(false)},4000);
 
 // ---- Tema menu aplikasi ----
 var THEME_KEY="menuai.theme";
